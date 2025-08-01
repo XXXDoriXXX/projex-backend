@@ -35,3 +35,5 @@ prisma/dev.db-journal
 # TypeScript
 *.tsbuildinfo
 
+
+/src/generated/prisma
