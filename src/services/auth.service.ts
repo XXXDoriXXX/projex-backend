@@ -5,6 +5,9 @@ import jwt from "jsonwebtoken";
 import { Resend } from 'resend';
 import { OAuth2Client } from 'google-auth-library';
 import axios from "axios";
+
+
+
 const JWT_SECRET = process.env.JWT_SECRET || 'MewMewMew';
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
@@ -36,7 +39,7 @@ export const createUser = async (username: string, password: string, email:strin
 
 export const getUserByEmail = async (email: string) => {
     return prisma.user.findUnique({
-        where: { email },select:{id: true, username: true}
+        where: { email },select:{id: true, username: true, email:true}
     })
 }
 export const getFullUserByEmail = async (email: string) => {
@@ -44,12 +47,38 @@ export const getFullUserByEmail = async (email: string) => {
         where: { email }
     });
 }
+const generateCodce = async () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+}
+export const generatePasswordResetCode = async (email: string) => {
+    const user = await getUserByEmail(email);
+    if (!user) throw new Error('User not found');
+    try {
+        const code = await generateCodce();
+        console.log(`Generated password reset code for ${email}: ${code}`);
+        const updatedUser = await prisma.user.update({
+            where: { email },
+            data: {
+                passwordResetToken: code,
+                passwordResetExpires:new Date(Date.now() + 10 * 60 * 1000)
+            },
+        });
+
+        console.log("Updated user:", updatedUser);
+
+        return code;
+
+    } catch (error) {
+        console.log(error);
+        throw new Error('Error generating password reset code');
+    }
+}
 export const generateVerificationCode = async (email:string) => {
 
     const user= await getUserByEmail(email);
     if (!user) throw new Error('User not found');
     try{
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const code =await generateCodce();
         console.log(`Generated verification code for ${email}: ${code}`);
         const updatedUser = await prisma.user.update({
             where: { email },
@@ -167,3 +196,50 @@ export const generateToken = (user: { id: string; username: string }) => {
         { expiresIn: '1h' }
     );
 };
+export async function sendResetPasswordEmail(email: string) {
+    const user = await getUserByEmail(email);
+    if (!user) throw new Error('User not found');
+
+    const code = await generatePasswordResetCode(email);
+
+    await resend.emails.send({
+        from: 'no-reply@projex.foo',
+        to: email,
+        subject: 'Reset your password – Projex',
+        html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; background: #ffffff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #eaeaea;">
+            <h2 style="color: #2d2d2d;">🔐 Reset your password</h2>
+            <p style="font-size: 16px; color: #4a4a4a;">Hi <strong>${user.username}</strong>,</p>
+            <p style="font-size: 16px; color: #4a4a4a;">We received a request to reset the password for your Projex account.</p>
+            <p style="margin: 24px 0; text-align: center;">
+                <span style="display: inline-block; font-size: 28px; letter-spacing: 8px; font-weight: bold; color: #111;">${code}</span>
+            </p>
+            <p style="font-size: 14px; color: #666;">This code will expire in <strong>10 minutes</strong>. If you didn’t request a password reset, you can safely ignore this email.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+            <p style="font-size: 14px; color: #999;">– The Projex Team</p>
+        </div>
+        `
+    });
+}
+export const verifyResetPasswordToken = async (token: string) => {
+    const user = await prisma.user.findUnique({
+        where: { passwordResetToken: token },
+    });
+
+    if (!user || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
+        throw new Error("Invalid or expired reset password token");
+    }
+
+    return user;
+}
+export const updateUserPassword = async (userId: string, newPassword: string) => {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    return prisma.user.update({
+        where: { id: userId },
+        data: {
+            password: hashedPassword,
+            passwordResetToken: null,
+            passwordResetExpires: null,
+        },
+    });
+}

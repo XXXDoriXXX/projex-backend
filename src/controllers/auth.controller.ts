@@ -134,7 +134,6 @@ export const githubLogin = async (req: Request, res: Response) => {
             }
         });
 
-
         if (!user) {
             user = await prisma.user.create({
                 data: {
@@ -144,6 +143,12 @@ export const githubLogin = async (req: Request, res: Response) => {
                     isVerified: true,
                     githubId: githubId.toString(),
                 },
+            });
+        }
+        if(user.githubId !== githubId.toString()) {
+            user = await prisma.user.update({
+                where: { id: user.id },
+                data: { githubId: githubId.toString() }
             });
         }
 
@@ -186,3 +191,41 @@ export const googleLogin = async (req: Request, res: Response) => {
         return res.status(401).json({ message: 'Invalid Google token' });
     }
 };
+export const confirmResetPassword = async (req: Request, res: Response) => {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+        return res.status(400).send({ message: 'Token and new password are required' });
+    }
+    if (newPassword.length < 6) {
+        return res.status(400).send({ message: 'Password must be at least 6 characters long' });
+    }
+    try {
+        const user = await authService.verifyResetPasswordToken(token);
+        if (!user) {
+            return res.status(400).send({ message: 'Invalid or expired token' });
+        }
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await authService.updateUserPassword(user.id, hashedPassword);
+        return res.status(200).send({ message: 'Password reset successfully' });
+    } catch (err) {
+        console.error('Error resetting password:', err);
+        return res.status(500).send({ message: 'Internal Server Error' });
+    }
+}
+export const sendResetPassword = async (req: Request, res: Response) => {
+    const { email } = req.body;
+    if (!email) {
+        return res.status(400).send({ message: 'Email is required' });
+    }
+    try {
+        const user = await authService.getUserByEmail(email);
+        if (!user) {
+            return res.status(404).send({ message: 'User not found' });
+        }
+        await authService.sendResetPasswordEmail(user.email);
+        return res.status(200).send({ message: 'Reset password email sent successfully' });
+    } catch (err) {
+        console.error('Error sending reset password email:', err);
+        return res.status(500).send({ message: 'Internal Server Error' });
+    }
+}
