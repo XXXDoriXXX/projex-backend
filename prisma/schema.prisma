@@ -19,27 +19,30 @@ enum UserRole {
 }
 
 model User {
-  id         String   @id @default(cuid())
-  email      String   @unique
-  password   String?
-  username   String
-  avatarUrl  String?
-  bio        String?
-  github     String?
-  linkedin   String?
-  telegram   String?
-  isActive   Boolean  @default(true)
-  isVerified Boolean  @default(false)
-  isBanned   Boolean  @default(false)
-  role       UserRole @default(USER)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  projects  Project[]
-  likes     Like[]
-  views     View[]
-  followers Follow[]  @relation("Following")
-  following Follow[]  @relation("Follower")
+  id                       String    @id @default(cuid())
+  email                    String    @unique
+  password                 String?
+  username                 String
+  avatarUrl                String?
+  bio                      String?
+  github                   String?
+  linkedin                 String?
+  telegram                 String?
+  isActive                 Boolean   @default(true)
+  isVerified               Boolean   @default(false)
+  isBanned                 Boolean   @default(false)
+  role                     UserRole  @default(USER)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  emailVerificationToken   String?   @unique
+  emailVerificationExpires DateTime?
+  passwordResetToken       String?   @unique
+  passwordResetExpires     DateTime?
+  projects                 Project[]
+  likes                    Like[]
+  views                    View[]
+  followers                Follow[]  @relation("Following")
+  following                Follow[]  @relation("Follower")
 }
 
 model Project {

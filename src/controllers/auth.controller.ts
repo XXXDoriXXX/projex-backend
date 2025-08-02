@@ -38,15 +38,50 @@ export const signUp = async (req: Request, res: Response) => {
         return res.status(409).send({message: 'Username already exists'});
     }
     try{
-        await authService.createUser(username, password, email);
-        return res.status(200).send({message: 'User created successfully'});}
+        const user = await authService.createUser(username, password, email);
+        const token = authService.generateToken(user);
+        await authService.sendEmail(email);
+
+
+        return res.status(200).send({message: 'User created successfully', token});}
 
     catch(err) {
         console.error('Error creating user:', err);
         return res.status(500).send({message: 'Internal Server Error'});
     }
 }
-
+export const sendVerificationCode = async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user?.userId;
+    console.log('Current user ID:', userId);
+    if (!userId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+    }
+    try {
+        const user = await authService.getUserById(userId);
+        console.log('Current user email:', user?.email);
+        if (!user) {
+            return res.status(404).send({ message: 'User not found' });
+        }
+        await authService.sendEmail(user.email);
+        return res.status(200).send({ message: 'Verification code sent successfully' });
+    } catch (err) {
+        console.error('Error sending verification code:', err);
+        return res.status(500).send({ message: 'Internal Server Error' });
+    }
+}
+export const verifyEmail = async (req: Request, res: Response) => {
+    const { token } = req.params;
+    if (!token) {
+        return res.status(400).send({ message: 'Token is required' });
+    }
+    try {
+        await authService.verifyVerificationCode(token);
+        return res.status(200).send({ message: 'Email verified successfully' });
+    } catch (err) {
+        console.error('Error verifying email:', err);
+        return res.status(500).send({ message: err });
+    }
+}
 export const login = async (req: Request, res: Response) => {
     const {email, password} = req.body;
     if (!email || !password) {
