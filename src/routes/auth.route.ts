@@ -1,6 +1,6 @@
 import {Router} from 'express';
 import {
-    getCurrentUser,
+    getCurrentUser, githubLogin,
     googleLogin,
     login,
     sendVerificationCode,
@@ -16,5 +16,6 @@ router.post('/login', login);
 router.post('/verify-email/:token', verifyEmail);
 router.post('/send-verification-code', authenticate,sendVerificationCode);
 router.post('/me', authenticate, getCurrentUser);
+router.get('/github/callback', githubLogin);
 export default router;
 

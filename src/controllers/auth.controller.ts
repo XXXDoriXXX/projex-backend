@@ -4,6 +4,8 @@ import prisma from "../prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import {AuthenticatedRequest} from "../middleware/auth";
+import {getGithubEmail} from "../services/auth.service";
+
 export const getCurrentUser = async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user?.userId;
     console.log('Current user ID:', userId);
@@ -105,6 +107,55 @@ export const login = async (req: Request, res: Response) => {
         return res.status(500).send({message: 'Internal Server Error'});
     }
 }
+export const githubLogin = async (req: Request, res: Response) => {
+    const code = req.query.code as string;
+    if (!code) {
+        return res.status(400).json({ message: 'Missing GitHub code' });
+    }
+
+    try {
+        const accessToken = await authService.getGithubAccessToken(code);
+
+        const githubUser = await authService.getGithubUserInfo(accessToken);
+        const githubEmail = await authService.getGithubEmail(accessToken);
+
+        const { login: username, avatar_url: avatar, id: githubId } = githubUser;
+
+        if (!username || !avatar || !githubId || !githubEmail) {
+            return res.status(400).json({ message: 'Incomplete GitHub user data' });
+        }
+
+        let user = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { githubId: githubId.toString() },
+                    { email: githubEmail },
+                ]
+            }
+        });
+
+
+        if (!user) {
+            user = await prisma.user.create({
+                data: {
+                    email: githubEmail,
+                    username,
+                    avatarUrl: avatar,
+                    isVerified: true,
+                    githubId: githubId.toString(),
+                },
+            });
+        }
+
+        const token = authService.generateToken({ id: user.id, username: user.username });
+
+        return res.status(200).json({ message: 'Login successful', token });
+    } catch (err) {
+        console.error('GitHub login error:', err);
+        return res.status(401).json({ message: 'GitHub login failed' });
+    }
+};
+
 export const googleLogin = async (req: Request, res: Response) => {
     const { idToken } = req.body;
     if (!idToken) {

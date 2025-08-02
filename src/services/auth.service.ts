@@ -4,7 +4,10 @@ import crypto from 'crypto';
 import jwt from "jsonwebtoken";
 import { Resend } from 'resend';
 import { OAuth2Client } from 'google-auth-library';
+import axios from "axios";
 const JWT_SECRET = process.env.JWT_SECRET || 'MewMewMew';
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
+const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
 const resend = new Resend(process.env.RESEND_API_KEY || '');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 export const getUserById = async (id: string) => {
@@ -106,6 +109,38 @@ export const sendEmail = async (email: string) => {
   `
     });
 
+}
+export const getGithubAccessToken = async (code: string) => {
+    const tokenRes = await axios.post(
+        'https://github.com/login/oauth/access_token',
+        {
+            client_id: GITHUB_CLIENT_ID,
+            client_secret: GITHUB_CLIENT_SECRET,
+            code,
+        },
+        {
+            headers: { Accept: 'application/json' },
+        }
+    );
+
+    const access_token = tokenRes.data.access_token;
+    if (!access_token) throw new Error('Access token not received');
+    return access_token;
+}
+export const getGithubUserInfo = async (token: string) => {
+    const userRes = await axios.get('https://api.github.com/user', {
+        headers: { Authorization: `token ${token}` },
+    });
+    return userRes.data;
+}
+export const getGithubEmail = async (token: string) => {
+    const emailRes = await axios.get('https://api.github.com/user/emails', {
+        headers: { Authorization: `token ${token}` },
+    });
+    const emails = emailRes.data;
+    const primaryEmail = emails.find((email: any) => email.primary && email.verified);
+    if (!primaryEmail) throw new Error('Primary email not found');
+    return primaryEmail.email;
 }
 export const verifyGoogleToken = async (token: string) => {
     const ticket = await client.verifyIdToken({
