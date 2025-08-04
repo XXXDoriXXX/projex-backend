@@ -15,7 +15,15 @@ export const getCurrentUser = async (req: AuthenticatedRequest, res: Response) =
 
     try {
         const user = await authService.getUserById(userId);
-        return res.status(200).json(user);
+        const avatarUrl = await authService.getUserAvatar(userId);
+        if (!avatarUrl) {
+            return res.status(200).json(user);
+        }
+        const userWithAvatar = {
+            ...user,
+            avatarUrl: avatarUrl.avatarUrl
+        };
+        return res.status(200).json(userWithAvatar);
     } catch (err) {
         console.error('Error getting user:', err);
         return res.status(500).json({ message: 'Internal Server Error' });
