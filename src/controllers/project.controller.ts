@@ -11,9 +11,6 @@ export const uploadMedia = async (req: AuthenticatedRequest, res: Response) => {
 }
 export const createProject = async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user?.userId;
-    if (!userId) {
-        return res.status(401).json({ message: 'Unauthorized' });
-    }
     const {
         title,
         description,
@@ -21,9 +18,6 @@ export const createProject = async (req: AuthenticatedRequest, res: Response) =>
         demoUrl,
         media,
         technologies}= req.body;
-    if(!title || !description) {
-        return res.status(400).json({ message: 'Title and description are required' });
-    }
     const projectData: CreateProjectData = {
         userId,
         title,
@@ -35,8 +29,10 @@ export const createProject = async (req: AuthenticatedRequest, res: Response) =>
     try {
         const project = await authService.createProject(projectData );
         return res.status(201).json(project);
-    } catch (err) {
+    } catch (err: any) {
         console.error('Error creating project:', err);
-        return res.status(500).json({ message: 'Internal Server Error' });
+
+        return res.status(400).json({ message: err.message });
     }
+
 }
