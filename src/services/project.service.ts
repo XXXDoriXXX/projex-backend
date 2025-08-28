@@ -1,4 +1,5 @@
 import prisma from "../prisma";
+import {CreateProjectData} from "../types/Project";
 
 export const getProjectById = async (id: string) => {
     try {
@@ -53,10 +54,31 @@ export const updateProject = async (id: string, data: any) => {
         throw new Error("Failed to update project");
     }
 }
-export const createProject = async (data: any) => {
+
+export const createProject = async (data:CreateProjectData) => {
     try {
         const newProject = await prisma.project.create({
-            data,
+            data: {
+                userId: data.userId,
+                title: data.title,
+                description: data.description,
+                githubUrl: data.githubUrl??null,
+                demoUrl: data.demoUrl??null,
+                media: data.media?{
+                    create:data.media.map(m=>({
+                        type: m.type,
+                        url: m.url,
+                    })),
+                }:undefined,
+                technologies: data.technologies?{
+                    connect: data.technologies.map((id)=>({id})),
+                } : undefined,
+            },
+            include: {
+                user: true,
+                media: true,
+                technologies: true,
+            },
         });
         return newProject;
     } catch (error) {

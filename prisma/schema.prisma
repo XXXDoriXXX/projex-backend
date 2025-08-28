@@ -19,52 +19,71 @@ enum UserRole {
 }
 
 model User {
-  id                       String    @id @default(cuid())
-  email                    String    @unique
+  id                       String        @id @default(cuid())
+  email                    String        @unique
   password                 String?
   username                 String
   avatarUrl                String?
   bio                      String?
-  github                   String?
-  linkedin                 String?
-  telegram                 String?
-  githubId                 String?   @unique
-  isActive                 Boolean   @default(true)
-  isVerified               Boolean   @default(false)
-  isBanned                 Boolean   @default(false)
-  role                     UserRole  @default(USER)
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
-  emailVerificationToken   String?   @unique
+  githubId                 String?       @unique
+  isActive                 Boolean       @default(true)
+  isVerified               Boolean       @default(false)
+  isBanned                 Boolean       @default(false)
+  role                     UserRole      @default(USER)
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+  emailVerificationToken   String?       @unique
   emailVerificationExpires DateTime?
-  passwordResetToken       String?   @unique
+  passwordResetToken       String?       @unique
   passwordResetExpires     DateTime?
-  projects                 Project[]
+  projects                 Project[] // Projects authored by this user
   likes                    Like[]
   views                    View[]
-  followers                Follow[]  @relation("Following")
-  following                Follow[]  @relation("Follower")
+  followers                Follow[]      @relation("Following")
+  following                Follow[]      @relation("Follower")
+  subauthoredProjects      Project[]     @relation("ProjectSubauthors") // Projects where user is co-author
+  socialLinks              SocialMedia[]
+}
+
+model SocialMedia {
+  id       String  @id @default(cuid())
+  user     User    @relation(fields: [userId], references: [id])
+  userId   String
+  platform String // e.g. "linkedin", "github", "telegram", etc.
+  url      String // Full link to the profile
+  handle   String? // Optional: username on the platform
+  verified Boolean @default(false) // Optional: if future verification is needed
 }
 
 model Project {
-  id          String   @id @default(cuid())
-  title       String
-  description String
-  videoUrl    String?
-  githubUrl   String?
-  demoUrl     String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String        @id @default(cuid()) // Project unique ID
+  title            String // Project title
+  description      String // Project description
+  githubUrl        String? // GitHub repository link
+  demoUrl          String? // Demo link
+  previewUrl       String? // Main image preview
+  status           ProjectStatus @default(DRAFT) // Project status
+  privateLinkToken String?       @unique // Secret token for private access
+  createdAt        DateTime      @default(now()) // Creation date
+  updatedAt        DateTime      @updatedAt // Last updated date
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id]) // Main author
   userId String
 
-  media        ProjectMedia[]
-  technologies Technology[]   @relation("ProjectTechnologies")
-  likes        Like[]
-  views        View[]
+  subauthors User[] @relation("ProjectSubauthors") // Co-authors
+
+  media        ProjectMedia[] // Media files
+  technologies Technology[]   @relation("ProjectTechnologies") // Used technologies
+  likes        Like[] // Likes
+  views        View[] // Views
 
   @@index([userId])
+}
+
+enum ProjectStatus {
+  DRAFT // Draft
+  PUBLISHED // Published
+  ARCHIVED // Archived
 }
 
 model ProjectMedia {
