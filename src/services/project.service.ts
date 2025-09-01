@@ -38,10 +38,17 @@ export const getUserProjects = async (userId: string) => {
         throw new Error("Failed to fetch user's projects");
     }
 }
-export const deleteProject = async (id: string) => {
+export const  deleteProject = async (id: string, userId:string) => {
+    if(!id) throw new Error("Project ID is required");
+    if(!userId) throw new Error("User ID is required");
     try {
         const deletedProject = await prisma.project.delete({
-            where: { id },
+            where: {
+                id_userId: {
+                    id,
+                    userId,
+                },
+            },
         });
         return deletedProject;
     } catch (error) {

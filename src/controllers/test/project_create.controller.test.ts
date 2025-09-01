@@ -8,7 +8,7 @@ import { validateProject } from "../../middleware/project/validateProject";
 const JWT_SECRET = process.env.JWT_SECRET || 'MeowMeowMeow';
 
 const testToken = jwt.sign(
-    { userId: 'cmevm6dso0000c6x4hdp01m93', username: 'Dehimik' },
+    { userId: 'cmf16r8iy0000c64sdqbfmb30', username: 'Dehimik' },
     JWT_SECRET,
     { expiresIn: '1h' }
 );
@@ -276,9 +276,7 @@ describe('POST /api/project/create', () => {
         expect(res.body.message).toBe("Title contains invalid characters");
     });
 
-    // Додавай ще кейси за потреби: наприклад, унікальність назви (створити двічі)
     it('should return 400 if project title is not unique per user', async () => {
-        // 1. create project
         await request(app)
             .post('/api/project/create')
             .set('Authorization', `Bearer ${testToken}`)
@@ -286,7 +284,6 @@ describe('POST /api/project/create', () => {
                 title: "UniqueTitle",
                 description: "This is a test project"
             });
-        // 2. create same project title again for same user
         const res = await request(app)
             .post('/api/project/create')
             .set('Authorization', `Bearer ${testToken}`)

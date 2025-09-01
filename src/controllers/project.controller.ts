@@ -36,3 +36,22 @@ export const createProject = async (req: AuthenticatedRequest, res: Response) =>
     }
 
 }
+export const deleteProject = async (req: AuthenticatedRequest, res: Response) => {
+   const userId = req.user?.userId;
+    const projectId = req.params.id;
+
+    try {
+        const project = await authService.deleteProject(projectId, userId!);
+        return res.status(200).json(project);
+    }
+    catch (err: any) {
+        console.error('Error deleting project:', err);
+        if (err.message === 'Project not found') {
+            return res.status(404).json({ message: 'Project not found' });
+        }
+        if (err.message === 'Unauthorized') {
+            return res.status(403).json({ message: 'Unauthorized' });
+        }
+        return res.status(500).json({ message:err.message });
+    }
+}
