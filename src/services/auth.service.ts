@@ -23,6 +23,7 @@ export const getUserAvatar = async (id: string) => {
         where: { id },select:{avatarUrl: true}
     })
 }
+
 // export const getUserByUsername = async (username: string) => {
 //     return prisma.user.findUnique({
 //         where: { username },select:{id: true, username: true}
@@ -108,11 +109,12 @@ export const verifyVerificationCode = async (token: string) => {
     const user = await prisma.user.findUnique({
         where: { emailVerificationToken: token },
     });
-
+    console.log(user)
+    console.log(token)
     if (!user || !user.emailVerificationExpires || user.emailVerificationExpires < new Date()) {
+        console.log(user?.emailVerificationExpires, new Date());
         throw new Error("Invalid or expired verification code");
     }
-
     return await prisma.user.update({
         where: { id: user.id },
         data: {

@@ -6,6 +6,7 @@ import winston from "winston";
 import fs from "fs";
 import authRoute from "./routes/auth.route";
 import {logger} from "./middleware/logger";
+import projectRoute from "./routes/project.route";
 const app = express();
 const accessLogStream = fs.createWriteStream("access.log", { flags: "a" });
 app.use(
@@ -29,6 +30,7 @@ app.use(express.json());
 
 app.use("/api/status", statusRoute);
 app.use("/api/auth", authRoute);
+app.use("/api/project", projectRoute);
 app.get("/", (req, res) => {
   res.send("Hello World!");
 });

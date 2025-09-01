@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
+import {getUserById} from "../services/auth.service";
 
 const JWT_SECRET = process.env.JWT_SECRET || 'MeowMeowMeow';
 
@@ -18,17 +19,20 @@ export const authenticate = (req: AuthenticatedRequest, res: Response, next: Nex
         return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    jwt.verify(token, JWT_SECRET, async (err, decoded) => {
         if (err || typeof decoded !== 'object' || !decoded) {
-            return res.status(403).json({ message: 'Forbidden' });
+            return res.status(403).json({message: 'Forbidden'});
         }
 
-        const { userId, username } = decoded as { userId: string; username: string };
+        const {userId, username} = decoded as { userId: string; username: string };
         if (!userId || !username) {
-            return res.status(403).json({ message: 'Invalid token payload' });
+            return res.status(403).json({message: 'Invalid token payload'});
         }
-
-        req.user = { userId, username };
+        const user = await getUserById(decoded.userId);
+        if (!user) {
+            return res.status(403).json({message: 'User does not exist'});
+        }
+        req.user = {userId, username};
         console.log('User verified :', req.user);
         const start = Date.now();
 

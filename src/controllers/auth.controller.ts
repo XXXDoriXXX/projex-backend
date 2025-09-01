@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import {AuthenticatedRequest} from "../middleware/auth";
 import {getGithubEmail} from "../services/auth.service";
-
+/*TODO refactor like project controller*/
 export const getCurrentUser = async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user?.userId;
     console.log('Current user ID:', userId);
@@ -79,8 +79,9 @@ export const sendVerificationCode = async (req: AuthenticatedRequest, res: Respo
         return res.status(500).send({ message: 'Internal Server Error' });
     }
 }
-export const verifyEmail = async (req: Request, res: Response) => {
+export const verifyEmail = async (req: AuthenticatedRequest, res: Response) => {
     const { token } = req.params;
+    console.log("TOKEN:",token)
     if (!token) {
         return res.status(400).send({ message: 'Token is required' });
     }
