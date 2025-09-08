@@ -19,30 +19,33 @@ enum UserRole {
 }
 
 model User {
-  id                       String        @id @default(cuid())
-  email                    String        @unique
+  id                       String                   @id @default(cuid())
+  email                    String                   @unique
   password                 String?
   username                 String
   avatarUrl                String?
   bio                      String?
-  githubId                 String?       @unique
-  isActive                 Boolean       @default(true)
-  isVerified               Boolean       @default(false)
-  isBanned                 Boolean       @default(false)
-  role                     UserRole      @default(USER)
-  createdAt                DateTime      @default(now())
-  updatedAt                DateTime      @updatedAt
-  emailVerificationToken   String?       @unique
+  githubId                 String?                  @unique
+  isActive                 Boolean                  @default(true)
+  isVerified               Boolean                  @default(false)
+  isBanned                 Boolean                  @default(false)
+  role                     UserRole                 @default(USER)
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  emailVerificationToken   String?                  @unique
   emailVerificationExpires DateTime?
-  passwordResetToken       String?       @unique
+  passwordResetToken       String?                  @unique
   passwordResetExpires     DateTime?
   projects                 Project[] // Projects authored by this user
   likes                    Like[]
   views                    View[]
-  followers                Follow[]      @relation("Following")
-  following                Follow[]      @relation("Follower")
-  subauthoredProjects      Project[]     @relation("ProjectSubauthors") // Projects where user is co-author
+  followers                Follow[]                 @relation("Following")
+  following                Follow[]                 @relation("Follower")
+  subauthoredProjects      Project[]                @relation("ProjectSubauthors") // Projects where user is co-author
   socialLinks              SocialMedia[]
+  Hackathon                Hackathon[]
+  HackathonParticipant     HackathonParticipant[]
+  HackathonProjectRating   HackathonProjectRating[]
 }
 
 model SocialMedia {
@@ -72,10 +75,11 @@ model Project {
 
   subauthors User[] @relation("ProjectSubauthors") // Co-authors
 
-  media        ProjectMedia[] // Media files
-  technologies Technology[]   @relation("ProjectTechnologies") // Used technologies
-  likes        Like[] // Likes
-  views        View[] // Views
+  hackathonProjects HackathonProject[]
+  media             ProjectMedia[] // Media files
+  technologies      Technology[]       @relation("ProjectTechnologies") // Used technologies
+  likes             Like[] // Likes
+  views             View[] // Views
 
   @@unique([id, userId])
   @@index([userId])
@@ -119,7 +123,7 @@ model Like {
 model View {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
-  ip        String?
+  ip        String   @db.Inet
 
   userId    String?
   projectId String
@@ -143,4 +147,85 @@ model Follow {
   @@unique([followerId, followingId])
   @@index([followerId])
   @@index([followingId])
+}
+
+model Hackathon {
+  id          String          @id @default(cuid())
+  title       String
+  description String
+  startDate   DateTime
+  endDate     DateTime
+  status      HackathonStatus @default(OPEN)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  author   User   @relation(fields: [authorId], references: [id])
+  authorId String
+
+  participants HackathonParticipant[]
+  themes       HackathonThemeCategory[] @relation("HackathonThemes")
+  projects     HackathonProject[]
+}
+
+enum HackathonStatus {
+  OPEN
+  CLOSED
+  ARCHIVED
+}
+
+model HackathonParticipant {
+  id          String    @id @default(cuid())
+  user        User      @relation(fields: [userId], references: [id])
+  userId      String
+  hackathon   Hackathon @relation(fields: [hackathonId], references: [id])
+  hackathonId String
+
+  joinedAt DateTime @default(now())
+
+  @@unique([userId, hackathonId])
+  @@index([hackathonId])
+}
+
+model HackathonThemeCategory {
+  id         String      @id @default(cuid())
+  name       String
+  hackathons Hackathon[] @relation("HackathonThemes")
+}
+
+model HackathonProject {
+  id          String    @id @default(cuid())
+  hackathon   Hackathon @relation(fields: [hackathonId], references: [id])
+  hackathonId String
+  project     Project   @relation(fields: [projectId], references: [id])
+  projectId   String
+
+  ratings HackathonProjectRating[]
+
+  @@unique([hackathonId, projectId])
+  @@index([hackathonId])
+}
+
+model HackathonRatingCategory {
+  id                     String                   @id @default(cuid())
+  name                   String // Наприклад: "Інноваційність", "Дизайн", "Корисність"
+  order                  Int
+  HackathonProjectRating HackathonProjectRating[]
+}
+
+model HackathonProjectRating {
+  id                 String                  @id @default(cuid())
+  project            HackathonProject        @relation(fields: [hackathonProjectId], references: [id])
+  hackathonProjectId String
+  rater              User                    @relation(fields: [raterId], references: [id])
+  raterId            String
+  category           HackathonRatingCategory @relation(fields: [categoryId], references: [id])
+  categoryId         String
+  rating             Int // Наприклад, 1-10
+
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@unique([hackathonProjectId, raterId, categoryId])
+  @@index([hackathonProjectId])
+  @@index([categoryId])
 }
