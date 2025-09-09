@@ -59,6 +59,10 @@ export const updateProject = async (id: string, data: CreateProjectData) => {
         throw new Error("You do not have permission to update this project");
     }
     await projectFieldValid(data);
+    let previewUrlValue: string | null = project.previewUrl;
+    if (!previewUrlValue && data.media && data.media.length > 0) {
+        previewUrlValue = data.media[0].url;
+    }
     try {
         const updatedProject = await prisma.project.update({
             where: { id },
@@ -66,6 +70,7 @@ export const updateProject = async (id: string, data: CreateProjectData) => {
                 userId: data.userId,
                 title: data.title,
                 description: data.description,
+                previewUrl: previewUrlValue,
                 githubUrl: data.githubUrl ?? null,
                 demoUrl: data.demoUrl ?? null,
                 media: data.media
