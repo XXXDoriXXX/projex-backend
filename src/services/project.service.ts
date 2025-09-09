@@ -50,12 +50,12 @@ export const  deleteProject = async (id: string, userId:string) => {
         throw new Error("Failed to delete project");
     }
 }
-export const updateProject = async (id: string,currentUserId:string, data: CreateProjectData) => {
+export const updateProject = async (id: string, data: CreateProjectData) => {
     const project = await prisma.project.findUnique({ where: { id } });
     if (!project) {
         throw new Error("Project not found");
     }
-    if (project.userId !== currentUserId) {
+    if (project.userId !== data.userId) {
         throw new Error("You do not have permission to update this project");
     }
     await projectFieldValid(data);

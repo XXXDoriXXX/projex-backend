@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import * as authService from '../services/project.service';
+import * as projectService from '../services/project.service';
 import {AuthenticatedRequest} from "../middleware/auth";
 import {CreateProjectData} from "../types/Project";
 export const uploadMedia = async (req: AuthenticatedRequest, res: Response) => {
@@ -27,7 +27,7 @@ export const createProject = async (req: AuthenticatedRequest, res: Response) =>
         media,
         technologies } as CreateProjectData;
     try {
-        const project = await authService.createProject(projectData );
+        const project = await projectService.createProject(projectData );
         return res.status(201).json(project);
     } catch (err: any) {
         console.error('Error creating project:', err);
@@ -41,7 +41,7 @@ export const deleteProject = async (req: AuthenticatedRequest, res: Response) =>
     const projectId = req.params.id;
 
     try {
-        const project = await authService.deleteProject(projectId, userId!);
+        const project = await projectService.deleteProject(projectId, userId!);
         return res.status(200).json(project);
     }
     catch (err: any) {
@@ -53,5 +53,32 @@ export const deleteProject = async (req: AuthenticatedRequest, res: Response) =>
             return res.status(403).json({ message: 'Unauthorized' });
         }
         return res.status(500).json({ message:err.message });
+    }
+}
+export const updateProject = async (req:AuthenticatedRequest, res:Response) =>{
+    const userId = req.user?.userId;
+    const projectId = req.params.id;
+    const {
+        title,
+        description,
+        githubUrl,
+        demoUrl,
+        media,
+        technologies}= req.body;
+    const projectData: CreateProjectData = {
+        userId,
+        title,
+        description,
+        githubUrl,
+        demoUrl,
+        media,
+        technologies } as CreateProjectData;
+    try {
+        const updatedProject = await projectService.updateProject(projectId,projectData);
+        return res.status(200).json(updatedProject);
+    }
+    catch (err: any) {
+        console.error('Error updating project:', err);
+        return res.status(400).json({ message: err.message });
     }
 }
