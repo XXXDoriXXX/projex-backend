@@ -141,3 +141,37 @@ export const changeProjectVisibility = async (
 		return res.status(500).json({ message: err.message });
 	}
 };
+export const likeProject = async (req: AuthenticatedRequest, res: Response) => {
+	const userId = req.user?.userId;
+	const projectId = req.params.id;
+	try {
+		const updatedProject = await projectService.likeProject(projectId, userId!);
+		return res.status(200).json(updatedProject);
+	} catch (err: any) {
+		console.error("Error liking project:", err);
+		if (err.message === "Project not found") {
+			return res.status(404).json({ message: "Project not found" });
+		}
+		return res.status(500).json({ message: err.message });
+	}
+};
+export const unlikeProject = async (
+	req: AuthenticatedRequest,
+	res: Response,
+) => {
+	const userId = req.user?.userId;
+	const projectId = req.params.id;
+	try {
+		const updatedProject = await projectService.unlikeProject(
+			projectId,
+			userId!,
+		);
+		return res.status(200).json(updatedProject);
+	} catch (err: any) {
+		console.error("Error unliking project:", err);
+		if (err.message === "Project not found") {
+			return res.status(404).json({ message: "Project not found" });
+		}
+		return res.status(500).json({ message: err.message });
+	}
+};
