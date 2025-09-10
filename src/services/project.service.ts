@@ -187,6 +187,17 @@ export const getProjectStats = async (id: string) => {
 	}
 };
 export const likeProject = async (projectId: string, userId: string) => {
+	if (!projectId) throw new Error("Project ID is required");
+	if (!userId) throw new Error("User ID is required");
+	const existing = await prisma.like.findUnique({
+		where: {
+			userId_projectId: { userId, projectId },
+		},
+	});
+	if (existing) {
+		throw new Error("User has already liked this project");
+	}
+
 	try {
 		const like = await prisma.like.create({
 			data: {
@@ -194,13 +205,28 @@ export const likeProject = async (projectId: string, userId: string) => {
 				userId,
 			},
 		});
-		return like;
+		const count = await prisma.like.count({
+			where: { projectId },
+		});
+		return count;
 	} catch (error) {
 		console.error("Error liking project:", error);
 		throw new Error("Failed to like project");
 	}
 };
 export const unlikeProject = async (projectId: string, userId: string) => {
+	if (!projectId) throw new Error("Project ID is required");
+	if (!userId) throw new Error("User ID is required");
+	const existing = await prisma.like.findUnique({
+		where: {
+			userId_projectId: { userId, projectId },
+		},
+	});
+
+	if (!existing) {
+		throw new Error("Like not found");
+	}
+
 	try {
 		const unlike = await prisma.like.delete({
 			where: {
@@ -210,7 +236,10 @@ export const unlikeProject = async (projectId: string, userId: string) => {
 				},
 			},
 		});
-		return unlike;
+		const count = await prisma.like.count({
+			where: { projectId },
+		});
+		return count;
 	} catch (error) {
 		console.error("Error unliking project:", error);
 		throw new Error("Failed to unlike project");

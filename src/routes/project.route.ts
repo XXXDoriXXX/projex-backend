@@ -9,6 +9,8 @@ import {
 	getProjectById,
 	getUserProjects,
 	updateProject,
+	likeProject,
+	unlikeProject,
 } from "../controllers/project.controller.js";
 
 const router = Router();
@@ -19,4 +21,6 @@ router.get("/:id", optionalAuthenticate, getProjectById);
 router.get("/:id/:token", optionalAuthenticate, getProjectById);
 router.get("/user/:id", getUserProjects);
 router.patch("/visible/:id", authenticate, changeProjectVisibility);
+router.post("/like/:id", authenticate, likeProject);
+router.delete("/like/:id", authenticate, unlikeProject);
 export default router;
