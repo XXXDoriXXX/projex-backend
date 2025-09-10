@@ -1,0 +1,1 @@
+export type ProjectStatus = 'draft' | 'published' | 'archived';

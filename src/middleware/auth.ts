@@ -10,7 +10,33 @@ export interface AuthenticatedRequest extends Request {
         username: string;
     };
 }
+export const optionalAuthenticate = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
 
+    if (!token) {
+        return next();
+    }
+
+    jwt.verify(token, JWT_SECRET, async (err, decoded) => {
+        if (err || typeof decoded !== 'object' || !decoded) {
+            return next();
+        }
+
+        const { userId, username } = decoded as { userId: string; username: string };
+        if (!userId || !username) {
+            return next();
+        }
+
+        const user = await getUserById(userId);
+        if (!user) {
+            return next();
+        }
+
+        req.user = { userId, username };
+        next();
+    });
+};
 export const authenticate = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1];
@@ -18,7 +44,6 @@ export const authenticate = (req: AuthenticatedRequest, res: Response, next: Nex
     if (!token) {
         return res.status(401).json({ message: 'Unauthorized' });
     }
-
     jwt.verify(token, JWT_SECRET, async (err, decoded) => {
         if (err || typeof decoded !== 'object' || !decoded) {
             return res.status(403).json({message: 'Forbidden'});

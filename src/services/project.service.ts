@@ -1,8 +1,31 @@
 import prisma from "../prisma";
 import {CreateProjectData} from "../types/Project";
 import {projectFieldValid} from "./utils/projectFieldValid";
+import {ProjectVisible} from "../types/ProjectVisible";
 
-export const getProjectById = async (id: string) => {
+function canAccess(project: any, token?: string, userId?: string) {
+    if (!project) throw new Error("Project not found");
+
+    if (project.privateLinkToken === "private") {
+        if (project.userId !== userId) {
+            throw new Error("Access denied. not your project");
+        }
+        return true;
+    }
+
+    if (project.privateLinkToken) {
+        if (project.userId === userId) {
+            return true;
+        }
+        if (project.privateLinkToken !== token) {
+            throw new Error("Access denied. invalid token");
+        }
+        return true;
+    }
+
+    return true;
+}
+export const getProjectById = async (id: string, token?:string, userId?:string) => {
     try {
         const project = await prisma.project.findUnique({
         where: { id },
@@ -14,14 +37,11 @@ export const getProjectById = async (id: string) => {
             technologies: true,
         },
         });
-        if (!project) throw new Error("Project not found");
-        if(project.privateLinkToken){
-            throw new Error("Access denied");
-        }
+        canAccess(project, token, userId);
         return project;
     } catch (error: any) {
         console.error("Error fetching project:", error);
-        throw new Error("Failed to fetch project");
+        throw new Error(`${error}`);
     }
 }
 export const getUserProjects = async (userId: string) => {
@@ -192,5 +212,54 @@ export const unlikeProject = async (projectId: string, userId: string) => {
     } catch (error) {
         console.error("Error unliking project:", error);
         throw new Error("Failed to unlike project");
+    }
+}
+const changeVisibility = async (id: string, visible?: string) => {
+    try {
+        const updatedProject = await prisma.project.update({
+            where: {id},
+            data: {
+                privateLinkToken: `${visible}`,
+            },
+        })
+        return updatedProject;
+    }
+    catch (error: any) {
+        console.error("Error updating project visibility:", error);
+        throw new Error("Failed to update project visibility");
+    }
+}
+export const changeProjectVisibility = async (id: string, userId: string, visible: ProjectVisible) => {
+    const project = await prisma.project.findUnique({ where: { id } });
+    if (!project) {
+        throw new Error("Project not found");
+    }
+    if (project.userId !== userId) {
+        throw new Error("You do not have permission to update this project");
+    }
+    if(!visible){
+        throw new Error("Visibility option is required");
+    }
+    try {
+        let updatedProject;
+        switch(visible) {
+            case "link":
+                const token = [...Array(30)].map(() => Math.random().toString(36)[2]).join('');
+                updatedProject = changeVisibility(id,token );
+                break;
+            case"public":
+                updatedProject = changeVisibility(id);
+                break;
+            case "private":
+                updatedProject = changeVisibility(id,"private" );
+                break;
+            default:
+                console.log("Error updating project:", id , userId, visible);
+                throw new Error("Invalid visibility option");
+        }
+        return updatedProject;
+    } catch (error: any) {
+        console.error("Error updating project visibility:", error);
+        throw new Error("Failed to update project visibility");
     }
 }
