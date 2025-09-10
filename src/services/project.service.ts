@@ -1,26 +1,47 @@
 import prisma from "../prisma";
 import {CreateProjectData} from "../types/Project";
-const isValidUrl = (str: string) => {
-    try {
-        new URL(str);
+import {projectFieldValid} from "./utils/projectFieldValid";
+import {ProjectVisible} from "../types/ProjectVisible";
+
+function canAccess(project: any, token?: string, userId?: string) {
+    if (!project) throw new Error("Project not found");
+
+    if (project.privateLinkToken === "private") {
+        if (project.userId !== userId) {
+            throw new Error("Access denied. not your project");
+        }
         return true;
-    } catch {
-        return false;
     }
-};
-export const getProjectById = async (id: string) => {
+
+    if (project.privateLinkToken) {
+        if (project.userId === userId) {
+            return true;
+        }
+        if (project.privateLinkToken !== token) {
+            throw new Error("Access denied. invalid token");
+        }
+        return true;
+    }
+
+    return true;
+}
+export const getProjectById = async (id: string, token?:string, userId?:string) => {
     try {
         const project = await prisma.project.findUnique({
         where: { id },
         include: {
-            user: true,
-            likes: true,
+            media: true,
+            _count: {
+                select: { likes: true, views: true }
+            },
+            technologies: true,
         },
         });
+        canAccess(project, token, userId);
         return project;
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error fetching project:", error);
-        throw new Error("Failed to fetch project");
+        throw new Error(`${error}`);
     }
 }
 export const getUserProjects = async (userId: string) => {
@@ -28,12 +49,15 @@ export const getUserProjects = async (userId: string) => {
         const projects = await prisma.project.findMany({
             where: { userId },
             include: {
-                user: true,
-                likes: true,
+                media: true,
+                _count: {
+                    select: { likes: true, views: true }
+                },
+                technologies: true,
             },
         });
         return projects;
-    } catch (error) {
+    } catch (error:any ) {
         console.error("Error fetching user's projects:", error);
         throw new Error("Failed to fetch user's projects");
     }
@@ -56,14 +80,52 @@ export const  deleteProject = async (id: string, userId:string) => {
         throw new Error("Failed to delete project");
     }
 }
-export const updateProject = async (id: string, data: any) => {
+export const updateProject = async (id: string, data: CreateProjectData) => {
+    const project = await prisma.project.findUnique({ where: { id } });
+    if (!project) {
+        throw new Error("Project not found");
+    }
+    if (project.userId !== data.userId) {
+        throw new Error("You do not have permission to update this project");
+    }
+    await projectFieldValid(data);
+    let previewUrlValue: string | null = project.previewUrl;
+    if (!previewUrlValue && data.media && data.media.length > 0) {
+        previewUrlValue = data.media[0].url;
+    }
     try {
         const updatedProject = await prisma.project.update({
             where: { id },
-            data,
+            data: {
+                userId: data.userId,
+                title: data.title,
+                description: data.description,
+                previewUrl: previewUrlValue,
+                githubUrl: data.githubUrl ?? null,
+                demoUrl: data.demoUrl ?? null,
+                media: data.media
+                    ? {
+                        deleteMany: {}, // видаляє всі media, що належать проекту
+                        create: data.media?.map((m) => ({
+                            type: m.type,
+                            url: m.url,
+                        })),
+                    }
+                    : undefined,
+                technologies: data.technologies
+                    ? {
+                        set: data.technologies?.map((id) => ({ id })) ?? [],
+                    }
+                    : undefined,
+            },
+            include: {
+                user: true,
+                media: true,
+                technologies: true,
+            },
         });
         return updatedProject;
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error updating project:", error);
         throw new Error("Failed to update project");
     }
@@ -72,83 +134,7 @@ export const updateProject = async (id: string, data: any) => {
 
 
 export const createProject = async (data: CreateProjectData) => {
-    // title
-    if (!data.title || typeof data.title !== "string") {
-        throw new Error("Title is required and must be a string");
-    }
-    if (data.title.length < 3) {
-        throw new Error("Title must be at least 3 characters");
-    }
-    if (data.title.length > 50) {
-        throw new Error("Title length exceeds 50 characters");
-    }
-    if (!/^[a-zA-Z0-9 _\-]+$/.test(data.title)) {
-        throw new Error("Title contains invalid characters");
-    }
-
-    // desc
-    if (!data.description || typeof data.description !== "string") {
-        throw new Error("Description is required and must be a string");
-    }
-    if (data.description.length < 10) {
-        throw new Error("Description must be at least 10 characters");
-    }
-    if (data.description.length > 500) {
-        throw new Error("Description length exceeds 500 characters");
-    }
-
-    // github
-    if (data.githubUrl) {
-        if (typeof data.githubUrl !== "string") throw new Error("GitHub URL must be a string");
-        if (data.githubUrl.length > 150) throw new Error("GitHub URL length exceeds 150 characters");
-        if (!isValidUrl(data.githubUrl)) throw new Error("GitHub URL is invalid");
-        if (!data.githubUrl.startsWith("https://github.com/")) throw new Error("GitHub URL must be a GitHub link");
-    }
-
-    // demo
-    if (data.demoUrl) {
-        if (typeof data.demoUrl !== "string") throw new Error("Demo URL must be a string");
-        if (data.demoUrl.length > 150) throw new Error("Demo URL length exceeds 150 characters");
-        if (!isValidUrl(data.demoUrl)) throw new Error("Demo URL is invalid");
-    }
-
-    // media
-    if (data.media) {
-        if (!Array.isArray(data.media)) throw new Error("Media must be an array");
-        if (data.media.length > 10) throw new Error("Maximum 10 media items allowed");
-        const mediaTypes = ["image", "video"];
-        const urls = new Set<string>();
-        for (const m of data.media) {
-            if (!mediaTypes.includes(m.type)) throw new Error("Invalid media type");
-            if (!isValidUrl(m.url)) throw new Error("Media URL is invalid");
-            if (urls.has(m.url)) throw new Error("Duplicate media URLs not allowed");
-            urls.add(m.url);
-        }
-    }
-
-    // tech
-    if (data.technologies) {
-        if (!Array.isArray(data.technologies)) throw new Error("Technologies must be an array");
-        if (data.technologies.length > 15) throw new Error("Maximum 15 technologies allowed");
-        if (new Set(data.technologies).size !== data.technologies.length)
-            throw new Error("Duplicate technology IDs not allowed");
-        for (const id of data.technologies) {
-            if (typeof id !== "string" || id.length === 0) throw new Error("Technology ID must be a non-empty string");
-        }
-    }
-
-    // user
-    if (!data.userId || typeof data.userId !== "string") {
-        throw new Error("User ID is required");
-    }
-
-    // unique title user
-    const existing = await prisma.project.findFirst({
-        where: { userId: data.userId, title: data.title },
-    });
-    if (existing) throw new Error("Project title must be unique per user");
-
-    // create
+    await projectFieldValid(data);
     try {
         const newProject = await prisma.project.create({
             data: {
@@ -226,5 +212,54 @@ export const unlikeProject = async (projectId: string, userId: string) => {
     } catch (error) {
         console.error("Error unliking project:", error);
         throw new Error("Failed to unlike project");
+    }
+}
+const changeVisibility = async (id: string, visible?: string) => {
+    try {
+        const updatedProject = await prisma.project.update({
+            where: {id},
+            data: {
+                privateLinkToken: `${visible}`,
+            },
+        })
+        return updatedProject;
+    }
+    catch (error: any) {
+        console.error("Error updating project visibility:", error);
+        throw new Error("Failed to update project visibility");
+    }
+}
+export const changeProjectVisibility = async (id: string, userId: string, visible: ProjectVisible) => {
+    const project = await prisma.project.findUnique({ where: { id } });
+    if (!project) {
+        throw new Error("Project not found");
+    }
+    if (project.userId !== userId) {
+        throw new Error("You do not have permission to update this project");
+    }
+    if(!visible){
+        throw new Error("Visibility option is required");
+    }
+    try {
+        let updatedProject;
+        switch(visible) {
+            case "link":
+                const token = [...Array(30)].map(() => Math.random().toString(36)[2]).join('');
+                updatedProject = changeVisibility(id,token );
+                break;
+            case"public":
+                updatedProject = changeVisibility(id);
+                break;
+            case "private":
+                updatedProject = changeVisibility(id,"private" );
+                break;
+            default:
+                console.log("Error updating project:", id , userId, visible);
+                throw new Error("Invalid visibility option");
+        }
+        return updatedProject;
+    } catch (error: any) {
+        console.error("Error updating project visibility:", error);
+        throw new Error("Failed to update project visibility");
     }
 }
