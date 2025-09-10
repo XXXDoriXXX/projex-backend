@@ -7,12 +7,19 @@ export const getProjectById = async (id: string) => {
         const project = await prisma.project.findUnique({
         where: { id },
         include: {
-            user: true,
-            likes: true,
+            media: true,
+            _count: {
+                select: { likes: true, views: true }
+            },
+            technologies: true,
         },
         });
+        if (!project) throw new Error("Project not found");
+        if(project.privateLinkToken){
+            throw new Error("Access denied");
+        }
         return project;
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error fetching project:", error);
         throw new Error("Failed to fetch project");
     }
@@ -22,12 +29,15 @@ export const getUserProjects = async (userId: string) => {
         const projects = await prisma.project.findMany({
             where: { userId },
             include: {
-                user: true,
-                likes: true,
+                media: true,
+                _count: {
+                    select: { likes: true, views: true }
+                },
+                technologies: true,
             },
         });
         return projects;
-    } catch (error) {
+    } catch (error:any ) {
         console.error("Error fetching user's projects:", error);
         throw new Error("Failed to fetch user's projects");
     }
