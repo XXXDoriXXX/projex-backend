@@ -1,10 +1,9 @@
 import { Request, Response } from 'express';
-import * as authService from '../services/auth.service';
-import prisma from "../prisma";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import {AuthenticatedRequest} from "../middleware/auth";
-import {getGithubEmail} from "../services/auth.service";
+import * as authService from '../services/auth.service.js';
+import prisma from '../prisma.js';
+import bcrypt from 'bcryptjs';
+import { AuthenticatedRequest } from '../middleware/auth.js';
+
 /*TODO refactor like project controller*/
 export const getCurrentUser = async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user?.userId;
@@ -21,7 +20,7 @@ export const getCurrentUser = async (req: AuthenticatedRequest, res: Response) =
         }
         const userWithAvatar = {
             ...user,
-            avatarUrl: avatarUrl.avatarUrl
+            avatarUrl: avatarUrl.avatarUrl,
         };
         return res.status(200).json(userWithAvatar);
     } catch (err) {
@@ -30,36 +29,34 @@ export const getCurrentUser = async (req: AuthenticatedRequest, res: Response) =
     }
 };
 export const signUp = async (req: Request, res: Response) => {
-    const {username, password, email} = req.body;
+    const { username, password, email } = req.body;
     if (!username || !password || !email) {
-        return res.status(400).send({message: 'Username and password are required'});
+        return res.status(400).send({ message: 'Username and password are required' });
     }
-    if(email && !/\S+@\S+\.\S+/.test(email)) {
-        return res.status(400).send({message: 'Invalid email format'});
+    if (email && !/\S+@\S+\.\S+/.test(email)) {
+        return res.status(400).send({ message: 'Invalid email format' });
     }
     if (password.length < 6) {
-        return res.status(400).send({message: 'Password must be at least 6 characters long'});
+        return res.status(400).send({ message: 'Password must be at least 6 characters long' });
     }
     const existingUser = await authService.getUserByEmail(email);
     if (existingUser) {
-        return res.status(409).send({message: 'Email already exists'});
+        return res.status(409).send({ message: 'Email already exists' });
     }
-    if(await authService.getUserByEmail(email)) {
-        return res.status(409).send({message: 'Username already exists'});
+    if (await authService.getUserByEmail(email)) {
+        return res.status(409).send({ message: 'Username already exists' });
     }
-    try{
+    try {
         const user = await authService.createUser(username, password, email);
         const token = authService.generateToken(user);
         await authService.sendEmail(email);
 
-
-        return res.status(200).send({message: 'User created successfully', token});}
-
-    catch(err) {
+        return res.status(200).send({ message: 'User created successfully', token });
+    } catch (err) {
         console.error('Error creating user:', err);
-        return res.status(500).send({message: 'Internal Server Error'});
+        return res.status(500).send({ message: 'Internal Server Error' });
     }
-}
+};
 export const sendVerificationCode = async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user?.userId;
     console.log('Current user ID:', userId);
@@ -78,10 +75,10 @@ export const sendVerificationCode = async (req: AuthenticatedRequest, res: Respo
         console.error('Error sending verification code:', err);
         return res.status(500).send({ message: 'Internal Server Error' });
     }
-}
+};
 export const verifyEmail = async (req: AuthenticatedRequest, res: Response) => {
     const { token } = req.params;
-    console.log("TOKEN:",token)
+    console.log('TOKEN:', token);
     if (!token) {
         return res.status(400).send({ message: 'Token is required' });
     }
@@ -92,14 +89,14 @@ export const verifyEmail = async (req: AuthenticatedRequest, res: Response) => {
         console.error('Error verifying email:', err);
         return res.status(500).send({ message: err });
     }
-}
+};
 export const login = async (req: Request, res: Response) => {
-    const {email, password} = req.body;
+    const { email, password } = req.body;
     if (!email || !password) {
-        return res.status(400).send({message: 'Username and password are required'});
+        return res.status(400).send({ message: 'Username and password are required' });
     }
     try {
-        const user= await authService.getUserByEmail(email);
+        const user = await authService.getUserByEmail(email);
         if (!user) {
             return res.status(404).send({ message: 'User not found' });
         }
@@ -109,13 +106,12 @@ export const login = async (req: Request, res: Response) => {
             return res.status(401).send({ message: 'Invalid password' });
         }
         const token = authService.generateToken(dbUser);
-        return res.status(200).send({message: 'Login successful', token});
-    }
-    catch (err) {
+        return res.status(200).send({ message: 'Login successful', token });
+    } catch (err) {
         console.error('Error during login:', err);
-        return res.status(500).send({message: 'Internal Server Error'});
+        return res.status(500).send({ message: 'Internal Server Error' });
     }
-}
+};
 export const githubLogin = async (req: Request, res: Response) => {
     const code = req.query.code as string;
     if (!code) {
@@ -136,11 +132,8 @@ export const githubLogin = async (req: Request, res: Response) => {
 
         let user = await prisma.user.findFirst({
             where: {
-                OR: [
-                    { githubId: githubId.toString() },
-                    { email: githubEmail },
-                ]
-            }
+                OR: [{ githubId: githubId.toString() }, { email: githubEmail }],
+            },
         });
 
         if (!user) {
@@ -154,10 +147,10 @@ export const githubLogin = async (req: Request, res: Response) => {
                 },
             });
         }
-        if(user.githubId !== githubId.toString()) {
+        if (user.githubId !== githubId.toString()) {
             user = await prisma.user.update({
                 where: { id: user.id },
-                data: { githubId: githubId.toString() }
+                data: { githubId: githubId.toString() },
             });
         }
 
@@ -220,7 +213,7 @@ export const confirmResetPassword = async (req: Request, res: Response) => {
         console.error('Error resetting password:', err);
         return res.status(500).send({ message: 'Internal Server Error' });
     }
-}
+};
 export const sendResetPassword = async (req: Request, res: Response) => {
     const { email } = req.body;
     if (!email) {
@@ -237,4 +230,4 @@ export const sendResetPassword = async (req: Request, res: Response) => {
         console.error('Error sending reset password email:', err);
         return res.status(500).send({ message: 'Internal Server Error' });
     }
-}
+};

@@ -1,9 +1,8 @@
-import {Router} from 'express';
-import {getServerStatus} from '../controllers/status.controller';
+import { Router } from 'express';
+import { getServerStatus } from '../controllers/status.controller.js';
 
-const router =  Router();
+const router = Router();
 
 router.get('/', getServerStatus);
 
 export default router;
-

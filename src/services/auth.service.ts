@@ -1,12 +1,10 @@
-import prisma from "../prisma";
-import bcrypt from "bcryptjs";
+import prisma from '../prisma.js';
+import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import jwt from "jsonwebtoken";
+import jwt from 'jsonwebtoken';
 import { Resend } from 'resend';
 import { OAuth2Client } from 'google-auth-library';
-import axios from "axios";
-
-
+import axios from 'axios';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'MewMewMew';
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
@@ -15,14 +13,16 @@ const resend = new Resend(process.env.RESEND_API_KEY || '');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 export const getUserById = async (id: string) => {
     return prisma.user.findUnique({
-        where: { id },select:{id: true, username: true, email: true},
-    })
-}
+        where: { id },
+        select: { id: true, username: true, email: true },
+    });
+};
 export const getUserAvatar = async (id: string) => {
     return prisma.user.findUnique({
-        where: { id },select:{avatarUrl: true}
-    })
-}
+        where: { id },
+        select: { avatarUrl: true },
+    });
+};
 
 // export const getUserByUsername = async (username: string) => {
 //     return prisma.user.findUnique({
@@ -32,7 +32,7 @@ export const getUserAvatar = async (id: string) => {
 // export const getFullUserByUsername = async (username: string) => {
 //     return prisma.user.findUnique({ where: { username } });
 // };
-export const createUser = async (username: string, password: string, email:string) => {
+export const createUser = async (username: string, password: string, email: string) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     return prisma.user.create({
         data: {
@@ -41,21 +41,22 @@ export const createUser = async (username: string, password: string, email:strin
             password: hashedPassword,
         },
     });
-}
+};
 
 export const getUserByEmail = async (email: string) => {
     return prisma.user.findUnique({
-        where: { email },select:{id: true, username: true, email:true}
-    })
-}
+        where: { email },
+        select: { id: true, username: true, email: true },
+    });
+};
 export const getFullUserByEmail = async (email: string) => {
     return prisma.user.findUnique({
-        where: { email }
+        where: { email },
     });
-}
+};
 const generateCodce = async () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
-}
+};
 export const generatePasswordResetCode = async (email: string) => {
     const user = await getUserByEmail(email);
     if (!user) throw new Error('User not found');
@@ -66,25 +67,23 @@ export const generatePasswordResetCode = async (email: string) => {
             where: { email },
             data: {
                 passwordResetToken: code,
-                passwordResetExpires:new Date(Date.now() + 10 * 60 * 1000)
+                passwordResetExpires: new Date(Date.now() + 10 * 60 * 1000),
             },
         });
 
-        console.log("Updated user:", updatedUser);
+        console.log('Updated user:', updatedUser);
 
         return code;
-
     } catch (error) {
         console.log(error);
         throw new Error('Error generating password reset code');
     }
-}
-export const generateVerificationCode = async (email:string) => {
-
-    const user= await getUserByEmail(email);
+};
+export const generateVerificationCode = async (email: string) => {
+    const user = await getUserByEmail(email);
     if (!user) throw new Error('User not found');
-    try{
-        const code =await generateCodce();
+    try {
+        const code = await generateCodce();
         console.log(`Generated verification code for ${email}: ${code}`);
         const updatedUser = await prisma.user.update({
             where: { email },
@@ -94,26 +93,23 @@ export const generateVerificationCode = async (email:string) => {
             },
         });
 
-        console.log("Updated user:", updatedUser);
+        console.log('Updated user:', updatedUser);
 
         return code;
-
-    }
-    catch (error) {
+    } catch (error) {
         console.log(error);
         throw new Error('Error generating verification code');
     }
-
-}
+};
 export const verifyVerificationCode = async (token: string) => {
     const user = await prisma.user.findUnique({
         where: { emailVerificationToken: token },
     });
-    console.log(user)
-    console.log(token)
+    console.log(user);
+    console.log(token);
     if (!user || !user.emailVerificationExpires || user.emailVerificationExpires < new Date()) {
         console.log(user?.emailVerificationExpires, new Date());
-        throw new Error("Invalid or expired verification code");
+        throw new Error('Invalid or expired verification code');
     }
     return await prisma.user.update({
         where: { id: user.id },
@@ -142,10 +138,9 @@ export const sendEmail = async (email: string) => {
       <p style="font-size: 14px; color: #777;">This code will expire in 10 minutes. If you didn’t request this, you can ignore this email.</p>
       <p style="font-size: 14px; color: #999;">– The Projex Team</p>
     </div>
-  `
+  `,
     });
-
-}
+};
 export const getGithubAccessToken = async (code: string) => {
     const tokenRes = await axios.post(
         'https://github.com/login/oauth/access_token',
@@ -156,19 +151,19 @@ export const getGithubAccessToken = async (code: string) => {
         },
         {
             headers: { Accept: 'application/json' },
-        }
+        },
     );
 
     const access_token = tokenRes.data.access_token;
     if (!access_token) throw new Error('Access token not received');
     return access_token;
-}
+};
 export const getGithubUserInfo = async (token: string) => {
     const userRes = await axios.get('https://api.github.com/user', {
         headers: { Authorization: `token ${token}` },
     });
     return userRes.data;
-}
+};
 export const getGithubEmail = async (token: string) => {
     const emailRes = await axios.get('https://api.github.com/user/emails', {
         headers: { Authorization: `token ${token}` },
@@ -177,7 +172,7 @@ export const getGithubEmail = async (token: string) => {
     const primaryEmail = emails.find((email: any) => email.primary && email.verified);
     if (!primaryEmail) throw new Error('Primary email not found');
     return primaryEmail.email;
-}
+};
 export const verifyGoogleToken = async (token: string) => {
     const ticket = await client.verifyIdToken({
         idToken: token,
@@ -200,7 +195,7 @@ export const generateToken = (user: { id: string; username: string }) => {
             username: user.username,
         },
         JWT_SECRET,
-        { expiresIn: '1h' }
+        { expiresIn: '1h' },
     );
 };
 export async function sendResetPasswordEmail(email: string) {
@@ -225,7 +220,7 @@ export async function sendResetPasswordEmail(email: string) {
             <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
             <p style="font-size: 14px; color: #999;">– The Projex Team</p>
         </div>
-        `
+        `,
     });
 }
 export const verifyResetPasswordToken = async (token: string) => {
@@ -234,11 +229,11 @@ export const verifyResetPasswordToken = async (token: string) => {
     });
 
     if (!user || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
-        throw new Error("Invalid or expired reset password token");
+        throw new Error('Invalid or expired reset password token');
     }
 
     return user;
-}
+};
 export const updateUserPassword = async (userId: string, newPassword: string) => {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     return prisma.user.update({
@@ -249,4 +244,4 @@ export const updateUserPassword = async (userId: string, newPassword: string) =>
             passwordResetExpires: null,
         },
     });
-}
+};
