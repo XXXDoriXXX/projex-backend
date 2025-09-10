@@ -1,14 +1,14 @@
-import prisma from "../prisma";
-import {CreateProjectData} from "../types/Project";
-import {projectFieldValid} from "./utils/projectFieldValid";
-import {ProjectVisible} from "../types/ProjectVisible";
+import prisma from '../prisma.js';
+import { CreateProjectData } from '../types/Project.js';
+import { projectFieldValid } from './utils/projectFieldValid.js';
+import { ProjectVisible } from '../types/ProjectVisible.js';
 
 function canAccess(project: any, token?: string, userId?: string) {
-    if (!project) throw new Error("Project not found");
+    if (!project) throw new Error('Project not found');
 
-    if (project.privateLinkToken === "private") {
+    if (project.privateLinkToken === 'private') {
         if (project.userId !== userId) {
-            throw new Error("Access denied. not your project");
+            throw new Error('Access denied. not your project');
         }
         return true;
     }
@@ -18,32 +18,32 @@ function canAccess(project: any, token?: string, userId?: string) {
             return true;
         }
         if (project.privateLinkToken !== token) {
-            throw new Error("Access denied. invalid token");
+            throw new Error('Access denied. invalid token');
         }
         return true;
     }
 
     return true;
 }
-export const getProjectById = async (id: string, token?:string, userId?:string) => {
+export const getProjectById = async (id: string, token?: string, userId?: string) => {
     try {
         const project = await prisma.project.findUnique({
-        where: { id },
-        include: {
-            media: true,
-            _count: {
-                select: { likes: true, views: true }
+            where: { id },
+            include: {
+                media: true,
+                _count: {
+                    select: { likes: true, views: true },
+                },
+                technologies: true,
             },
-            technologies: true,
-        },
         });
         canAccess(project, token, userId);
         return project;
     } catch (error: any) {
-        console.error("Error fetching project:", error);
+        console.error('Error fetching project:', error);
         throw new Error(`${error}`);
     }
-}
+};
 export const getUserProjects = async (userId: string) => {
     try {
         const projects = await prisma.project.findMany({
@@ -51,20 +51,20 @@ export const getUserProjects = async (userId: string) => {
             include: {
                 media: true,
                 _count: {
-                    select: { likes: true, views: true }
+                    select: { likes: true, views: true },
                 },
                 technologies: true,
             },
         });
         return projects;
-    } catch (error:any ) {
+    } catch (error: any) {
         console.error("Error fetching user's projects:", error);
         throw new Error("Failed to fetch user's projects");
     }
-}
-export const  deleteProject = async (id: string, userId:string) => {
-    if(!id) throw new Error("Project ID is required");
-    if(!userId) throw new Error("User ID is required");
+};
+export const deleteProject = async (id: string, userId: string) => {
+    if (!id) throw new Error('Project ID is required');
+    if (!userId) throw new Error('User ID is required');
     try {
         const deletedProject = await prisma.project.delete({
             where: {
@@ -76,17 +76,17 @@ export const  deleteProject = async (id: string, userId:string) => {
         });
         return deletedProject;
     } catch (error) {
-        console.error("Error deleting project:", error);
-        throw new Error("Failed to delete project");
+        console.error('Error deleting project:', error);
+        throw new Error('Failed to delete project');
     }
-}
+};
 export const updateProject = async (id: string, data: CreateProjectData) => {
     const project = await prisma.project.findUnique({ where: { id } });
     if (!project) {
-        throw new Error("Project not found");
+        throw new Error('Project not found');
     }
     if (project.userId !== data.userId) {
-        throw new Error("You do not have permission to update this project");
+        throw new Error('You do not have permission to update this project');
     }
     await projectFieldValid(data);
     let previewUrlValue: string | null = project.previewUrl;
@@ -105,17 +105,17 @@ export const updateProject = async (id: string, data: CreateProjectData) => {
                 demoUrl: data.demoUrl ?? null,
                 media: data.media
                     ? {
-                        deleteMany: {}, // видаляє всі media, що належать проекту
-                        create: data.media?.map((m) => ({
-                            type: m.type,
-                            url: m.url,
-                        })),
-                    }
+                          deleteMany: {},
+                          create: data.media?.map((m) => ({
+                              type: m.type,
+                              url: m.url,
+                          })),
+                      }
                     : undefined,
                 technologies: data.technologies
                     ? {
-                        set: data.technologies?.map((id) => ({ id })) ?? [],
-                    }
+                          set: data.technologies?.map((id) => ({ id })) ?? [],
+                      }
                     : undefined,
             },
             include: {
@@ -126,12 +126,10 @@ export const updateProject = async (id: string, data: CreateProjectData) => {
         });
         return updatedProject;
     } catch (error: any) {
-        console.error("Error updating project:", error);
-        throw new Error("Failed to update project");
+        console.error('Error updating project:', error);
+        throw new Error('Failed to update project');
     }
-}
-
-
+};
 
 export const createProject = async (data: CreateProjectData) => {
     await projectFieldValid(data);
@@ -145,16 +143,16 @@ export const createProject = async (data: CreateProjectData) => {
                 demoUrl: data.demoUrl ?? null,
                 media: data.media
                     ? {
-                        create: data.media.map((m) => ({
-                            type: m.type,
-                            url: m.url,
-                        })),
-                    }
+                          create: data.media.map((m) => ({
+                              type: m.type,
+                              url: m.url,
+                          })),
+                      }
                     : undefined,
                 technologies: data.technologies
                     ? {
-                        connect: data.technologies.map((id) => ({ id })),
-                    }
+                          connect: data.technologies.map((id) => ({ id })),
+                      }
                     : undefined,
             },
             include: {
@@ -165,25 +163,22 @@ export const createProject = async (data: CreateProjectData) => {
         });
         return newProject;
     } catch (error: any) {
-        if (error.code === "P2002") {
-            throw new Error("Project with this title already exists");
+        if (error.code === 'P2002') {
+            throw new Error('Project with this title already exists');
         }
-        console.error("Error creating project:", error);
-        throw new Error("Failed to create project");
+        console.error('Error creating project:', error);
+        throw new Error('Failed to create project');
     }
 };
 export const getProjectStats = async (id: string) => {
     try {
-        const [likes, views] = await Promise.all([
-            prisma.like.count({where: {projectId: id}}),
-            prisma.view.count({where: {projectId: id}}),
-        ]);
-        return {likes, views};
+        const [likes, views] = await Promise.all([prisma.like.count({ where: { projectId: id } }), prisma.view.count({ where: { projectId: id } })]);
+        return { likes, views };
     } catch (error) {
-        console.error("Error fetching project stats:", error);
-        throw new Error("Failed to fetch project stats");
+        console.error('Error fetching project stats:', error);
+        throw new Error('Failed to fetch project stats');
     }
-}
+};
 export const likeProject = async (projectId: string, userId: string) => {
     try {
         const like = await prisma.like.create({
@@ -194,10 +189,10 @@ export const likeProject = async (projectId: string, userId: string) => {
         });
         return like;
     } catch (error) {
-        console.error("Error liking project:", error);
-        throw new Error("Failed to like project");
+        console.error('Error liking project:', error);
+        throw new Error('Failed to like project');
     }
-}
+};
 export const unlikeProject = async (projectId: string, userId: string) => {
     try {
         const unlike = await prisma.like.delete({
@@ -210,56 +205,55 @@ export const unlikeProject = async (projectId: string, userId: string) => {
         });
         return unlike;
     } catch (error) {
-        console.error("Error unliking project:", error);
-        throw new Error("Failed to unlike project");
+        console.error('Error unliking project:', error);
+        throw new Error('Failed to unlike project');
     }
-}
+};
 const changeVisibility = async (id: string, visible?: string) => {
     try {
         const updatedProject = await prisma.project.update({
-            where: {id},
+            where: { id },
             data: {
                 privateLinkToken: `${visible}`,
             },
-        })
+        });
         return updatedProject;
+    } catch (error: any) {
+        console.error('Error updating project visibility:', error);
+        throw new Error('Failed to update project visibility');
     }
-    catch (error: any) {
-        console.error("Error updating project visibility:", error);
-        throw new Error("Failed to update project visibility");
-    }
-}
+};
 export const changeProjectVisibility = async (id: string, userId: string, visible: ProjectVisible) => {
     const project = await prisma.project.findUnique({ where: { id } });
     if (!project) {
-        throw new Error("Project not found");
+        throw new Error('Project not found');
     }
     if (project.userId !== userId) {
-        throw new Error("You do not have permission to update this project");
+        throw new Error('You do not have permission to update this project');
     }
-    if(!visible){
-        throw new Error("Visibility option is required");
+    if (!visible) {
+        throw new Error('Visibility option is required');
     }
     try {
         let updatedProject;
-        switch(visible) {
-            case "link":
+        switch (visible) {
+            case 'link':
                 const token = [...Array(30)].map(() => Math.random().toString(36)[2]).join('');
-                updatedProject = changeVisibility(id,token );
+                updatedProject = changeVisibility(id, token);
                 break;
-            case"public":
+            case 'public':
                 updatedProject = changeVisibility(id);
                 break;
-            case "private":
-                updatedProject = changeVisibility(id,"private" );
+            case 'private':
+                updatedProject = changeVisibility(id, 'private');
                 break;
             default:
-                console.log("Error updating project:", id , userId, visible);
-                throw new Error("Invalid visibility option");
+                console.log('Error updating project:', id, userId, visible);
+                throw new Error('Invalid visibility option');
         }
         return updatedProject;
     } catch (error: any) {
-        console.error("Error updating project visibility:", error);
-        throw new Error("Failed to update project visibility");
+        console.error('Error updating project visibility:', error);
+        throw new Error('Failed to update project visibility');
     }
-}
+};

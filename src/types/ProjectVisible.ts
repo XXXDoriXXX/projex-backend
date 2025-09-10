@@ -1,1 +1,1 @@
-export type ProjectVisible= "public"|"link"|"private";
+export type ProjectVisible = 'public' | 'link' | 'private';

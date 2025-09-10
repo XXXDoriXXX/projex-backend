@@ -7,7 +7,7 @@ export const validateProject = [
     (req: Request, res: Response, next: NextFunction) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({  message: 'Title and description are required'});
+            return res.status(400).json({ message: 'Title and description are required' });
         }
         next();
     },
