@@ -1,1 +1,1 @@
-export type ProjectStatus = 'draft' | 'published' | 'archived';
+export type ProjectStatus = "draft" | "published" | "archived";
