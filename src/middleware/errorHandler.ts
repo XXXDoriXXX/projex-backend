@@ -14,7 +14,6 @@ interface ErrorResponse {
 		path: string;
 		method: string;
 	};
-
 	stack?: string;
 	context?: Record<string, any>;
 }
@@ -23,79 +22,80 @@ export const errorHandler = (
 	error: Error,
 	req: Request,
 	res: Response,
-	next: NextFunction,
-) => {
-	const requestId =
-		(req.headers["x-request-id"] as string) ||
-		Math.random().toString(36).substring(7);
+	_next: NextFunction
+): void => {
+	const requestId = (req as any).requestId;
 
-	let statusCode: number = 500;
-	let errorResponse: ErrorResponse;
+	let statusCode = 500;
+	let payload: ErrorResponse;
 
 	if (error instanceof BaseError) {
 		statusCode = error.statusCode;
-		errorResponse = {
+
+		payload = {
 			success: false,
 			error: {
 				type: error.name,
 				message: error.message,
 				statusCode: error.statusCode,
-				errorCode: error.errorCode,
+				errorCode: (error as any).errorCode,
 				requestId,
 				timestamp: new Date().toISOString(),
 				path: req.path,
-				method: req.method,
+				method: req.method
 			},
+			...(process.env.NODE_ENV === "development" && error.stack
+				? { stack: error.stack }
+				: {}),
+			...(process.env.NODE_ENV === "development" && (error as any).context
+				? { context: (error as any).context as Record<string, any> }
+				: {})
 		};
-		if (process.env.NODE_ENV === "development") {
-			if (error.context) {
-				errorResponse.context = error.context;
-			}
-			errorResponse.stack = error.stack;
-		}
+
 		if (statusCode >= 500) {
-			logger.error("Server Error", {
-				error: error.message,
-				stack: error.stack,
+			logger.error(error.message, {
 				requestId,
-				path: req.path,
 				method: req.method,
-				context: error.context,
+				url: req.originalUrl,
+				status: statusCode,
+				stack: error.stack
 			});
 		} else {
-			logger.warn("Client Error", {
-				error: error.message,
+			logger.warn(error.message, {
 				requestId,
-				path: req.path,
 				method: req.method,
+				url: req.originalUrl,
+				status: statusCode
 			});
 		}
 	} else {
-		errorResponse = {
+		payload = {
 			success: false,
 			error: {
-				type: "InternalServerError",
+				type: error.name || "InternalServerError",
 				message:
 					process.env.NODE_ENV === "production"
-						? "Internal Server Error"
+						? "Internal server error"
 						: error.message,
 				statusCode: 500,
 				requestId,
 				timestamp: new Date().toISOString(),
 				path: req.path,
-				method: req.method,
+				method: req.method
 			},
+			...(process.env.NODE_ENV !== "production" && error.stack
+				? { stack: error.stack }
+				: {})
 		};
-		if (process.env.NODE_ENV === "development") {
-			errorResponse.stack = error.stack;
-		}
-		logger.error("Unexpected Error", {
-			error: error.message,
-			stack: error.stack,
+
+		logger.error(error.message, {
 			requestId,
-			path: req.path,
 			method: req.method,
+			url: req.originalUrl,
+			status: 500,
+			stack: error.stack
 		});
 	}
-	res.status(statusCode).json(errorResponse);
+
+	res.status(statusCode).json(payload);
 };
