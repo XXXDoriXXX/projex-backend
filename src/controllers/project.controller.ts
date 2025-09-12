@@ -1,177 +1,219 @@
 import { Request, Response } from "express";
-import * as projectService from "../services/project.service.js";
-import { AuthenticatedRequest } from "../middleware/auth.js";
-import { CreateProjectData } from "../types/Project.js";
-import { ProjectVisible } from "../types/ProjectVisible.js";
-export const uploadMedia = async (req: AuthenticatedRequest, res: Response) => {
-	if (!req.body.file) {
-		return res.status(400).json({ message: "No file uploaded" });
-	}
-	//s3 logic upload
-	return res.status(501).json({ message: "Not implemented" });
-};
-export const createProject = async (
-	req: AuthenticatedRequest,
-	res: Response,
-) => {
-	const userId = req.user?.userId;
-	const { title, description, githubUrl, demoUrl, media, technologies } =
-		req.body;
-	const projectData: CreateProjectData = {
-		userId,
-		title,
-		description,
-		githubUrl,
-		demoUrl,
-		media,
-		technologies,
-	} as CreateProjectData;
-	try {
+import * as projectService from "../services/project.service";
+import { AuthenticatedRequest } from "../middleware/auth";
+import { CreateProjectData } from "../types/Project";
+import { ProjectVisible } from "../types/ProjectVisible";
+import { asyncHandler } from "../utils/asyncHandler";
+import {
+	ValidationError,
+	NotFoundError,
+	ForbiddenError,
+} from "../errors/CustomErrors";
+
+const isProjectVisible = (v: unknown): v is ProjectVisible =>
+	v === "public" || v === "link" || v === "private";
+
+export const uploadMedia = asyncHandler(
+	async (req: AuthenticatedRequest, res: Response) => {
+		if (!req.body?.file) {
+			throw new ValidationError("No file uploaded", "file");
+		}
+		// TODO: Додати S3 upload-логіку
+		res.status(501).json({ success: false, message: "Not implemented" });
+	},
+);
+
+export const createProject = asyncHandler(
+	async (req: AuthenticatedRequest, res: Response) => {
+		const userId = req.user?.userId;
+		if (!userId) {
+			throw new ForbiddenError("Authentication required");
+		}
+
+		const { title, description, githubUrl, demoUrl, media, technologies } =
+			req.body ?? {};
+
+		if (!title || typeof title !== "string") {
+			throw new ValidationError(
+				"Title is required and must be a string",
+				"title",
+			);
+		}
+		if (!description || typeof description !== "string") {
+			throw new ValidationError(
+				"Description is required and must be a string",
+				"description",
+			);
+		}
+
+		const projectData: CreateProjectData = {
+			userId,
+			title,
+			description,
+			githubUrl,
+			demoUrl,
+			media,
+			technologies,
+		};
+
 		const project = await projectService.createProject(projectData);
-		return res.status(201).json(project);
-	} catch (err: any) {
-		console.error("Error creating project:", err);
+		res
+			.status(201)
+			.json({ success: true, data: project, message: "Project created" });
+	},
+);
 
-		return res.status(400).json({ message: err.message });
-	}
-};
-export const deleteProject = async (
-	req: AuthenticatedRequest,
-	res: Response,
-) => {
-	const userId = req.user?.userId;
-	const projectId = req.params.id;
+export const deleteProject = asyncHandler(
+	async (req: AuthenticatedRequest, res: Response) => {
+		const userId = req.user?.userId;
+		if (!userId) {
+			throw new ForbiddenError("Authentication required");
+		}
 
-	try {
-		const project = await projectService.deleteProject(projectId, userId!);
-		return res.status(200).json(project);
-	} catch (err: any) {
-		console.error("Error deleting project:", err);
-		if (err.message === "Project not found") {
-			return res.status(404).json({ message: "Project not found" });
+		const projectId = req.params.id;
+		if (!projectId) {
+			throw new ValidationError("Project ID is required", "id");
 		}
-		if (err.message === "Unauthorized") {
-			return res.status(403).json({ message: "Unauthorized" });
+
+		const deleted = await projectService.deleteProject(projectId, userId);
+		res
+			.status(200)
+			.json({ success: true, data: deleted, message: "Project deleted" });
+	},
+);
+
+export const updateProject = asyncHandler(
+	async (req: AuthenticatedRequest, res: Response) => {
+		const userId = req.user?.userId;
+		if (!userId) {
+			throw new ForbiddenError("Authentication required");
 		}
-		return res.status(500).json({ message: err.message });
-	}
-};
-export const updateProject = async (
-	req: AuthenticatedRequest,
-	res: Response,
-) => {
-	const userId = req.user?.userId;
-	const projectId = req.params.id;
-	const { title, description, githubUrl, demoUrl, media, technologies } =
-		req.body;
-	const projectData: CreateProjectData = {
-		userId,
-		title,
-		description,
-		githubUrl,
-		demoUrl,
-		media,
-		technologies,
-	} as CreateProjectData;
-	try {
-		const updatedProject = await projectService.updateProject(
-			projectId,
-			projectData,
-		);
-		return res.status(200).json(updatedProject);
-	} catch (err: any) {
-		console.error("Error updating project:", err);
-		return res.status(400).json({ message: err.message });
-	}
-};
-export const getProjectById = async (
-	req: AuthenticatedRequest,
-	res: Response,
-) => {
-	const projectId = req.params.id;
-	const userId = req.user?.userId;
-	const token = req.params.token;
-	try {
+
+		const projectId = req.params.id;
+		if (!projectId) {
+			throw new ValidationError("Project ID is required", "id");
+		}
+
+		const { title, description, githubUrl, demoUrl, media, technologies } =
+			req.body ?? {};
+		if (title !== undefined && typeof title !== "string") {
+			throw new ValidationError("Title must be a string", "title");
+		}
+		if (description !== undefined && typeof description !== "string") {
+			throw new ValidationError("Description must be a string", "description");
+		}
+
+		const payload: CreateProjectData = {
+			userId,
+			title,
+			description,
+			githubUrl,
+			demoUrl,
+			media,
+			technologies,
+		} as CreateProjectData;
+
+		const updated = await projectService.updateProject(projectId, payload);
+		res
+			.status(200)
+			.json({ success: true, data: updated, message: "Project updated" });
+	},
+);
+
+export const getProjectById = asyncHandler(
+	async (req: AuthenticatedRequest, res: Response) => {
+		const projectId = req.params.id;
+		if (!projectId) {
+			throw new ValidationError("Project ID is required", "id");
+		}
+
+		const userId = req.user?.userId;
+		const token = req.params.token;
+
 		const project = await projectService.getProjectById(
 			projectId,
 			token,
 			userId,
 		);
 		if (!project) {
-			return res.status(404).json({ message: "Project not found" });
+			throw new NotFoundError("Project", projectId);
 		}
-		return res.status(200).json(project);
-	} catch (err: any) {
-		console.error("Error fetching project:", err);
-		return res.status(500).json({ message: err.message });
-	}
-};
-export const getUserProjects = async (req: Request, res: Response) => {
-	const userId = req.params.userId;
-	try {
+
+		res.status(200).json({ success: true, data: project });
+	},
+);
+
+export const getUserProjects = asyncHandler(
+	async (req: Request, res: Response) => {
+		// В роуті /user/:id — тому читаємо саме :id
+		const userId = req.params.id;
+		if (!userId) {
+			throw new ValidationError("User ID is required", "id");
+		}
+
 		const projects = await projectService.getUserProjects(userId);
-		return res.status(200).json(projects);
-	} catch (err: any) {
-		console.error("Error fetching user's projects:", err);
-		return res.status(500).json({ message: err.message });
-	}
-};
-export const changeProjectVisibility = async (
-	req: AuthenticatedRequest,
-	res: Response,
-) => {
-	const userId = req.user?.userId;
-	const projectId = req.params.id;
-	const projectVisible: ProjectVisible = req.body.visible;
-	try {
-		const updatedProject = await projectService.changeProjectVisibility(
+		res.status(200).json({ success: true, data: projects });
+	},
+);
+
+export const changeProjectVisibility = asyncHandler(
+	async (req: AuthenticatedRequest, res: Response) => {
+		const userId = req.user?.userId;
+		if (!userId) {
+			throw new ForbiddenError("Authentication required");
+		}
+
+		const projectId = req.params.id;
+		if (!projectId) {
+			throw new ValidationError("Project ID is required", "id");
+		}
+
+		const visible = req.body?.visible;
+		if (!isProjectVisible(visible)) {
+			throw new ValidationError("Invalid visibility option", "visible");
+		}
+
+		const updated = await projectService.changeProjectVisibility(
 			projectId,
-			userId!,
-			projectVisible,
+			userId,
+			visible,
 		);
-		return res.status(200).json(updatedProject);
-	} catch (err: any) {
-		console.error("Error changing project visibility:", err);
-		if (err.message === "Project not found") {
-			return res.status(404).json({ message: "Project not found" });
+		res
+			.status(200)
+			.json({ success: true, data: updated, message: "Visibility updated" });
+	},
+);
+
+export const likeProject = asyncHandler(
+	async (req: AuthenticatedRequest, res: Response) => {
+		const userId = req.user?.userId;
+		if (!userId) {
+			throw new ForbiddenError("Authentication required");
 		}
-		if (err.message === "Unauthorized") {
-			return res.status(403).json({ message: "Unauthorized" });
+
+		const projectId = req.params.id;
+		if (!projectId) {
+			throw new ValidationError("Project ID is required", "id");
 		}
-		return res.status(500).json({ message: err.message });
-	}
-};
-export const likeProject = async (req: AuthenticatedRequest, res: Response) => {
-	const userId = req.user?.userId;
-	const projectId = req.params.id;
-	try {
-		const updatedProject = await projectService.likeProject(projectId, userId!);
-		return res.status(200).json(updatedProject);
-	} catch (err: any) {
-		console.error("Error liking project:", err);
-		if (err.message === "Project not found") {
-			return res.status(404).json({ message: "Project not found" });
+
+		const likes = await projectService.likeProject(projectId, userId);
+		res.status(200).json({ success: true, likes });
+	},
+);
+
+export const unlikeProject = asyncHandler(
+	async (req: AuthenticatedRequest, res: Response) => {
+		const userId = req.user?.userId;
+		if (!userId) {
+			throw new ForbiddenError("Authentication required");
 		}
-		return res.status(500).json({ message: err.message });
-	}
-};
-export const unlikeProject = async (
-	req: AuthenticatedRequest,
-	res: Response,
-) => {
-	const userId = req.user?.userId;
-	const projectId = req.params.id;
-	try {
-		const updatedProject = await projectService.unlikeProject(
-			projectId,
-			userId!,
-		);
-		return res.status(200).json(updatedProject);
-	} catch (err: any) {
-		console.error("Error unliking project:", err);
-		if (err.message === "Project not found") {
-			return res.status(404).json({ message: "Project not found" });
+
+		const projectId = req.params.id;
+		if (!projectId) {
+			throw new ValidationError("Project ID is required", "id");
 		}
-		return res.status(500).json({ message: err.message });
-	}
-};
+
+		const likes = await projectService.unlikeProject(projectId, userId);
+		res.status(200).json({ success: true, likes });
+	},
+);

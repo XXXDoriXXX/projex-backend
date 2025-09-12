@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
-import * as authService from "../services/auth.service.js";
-import prisma from "../prisma.js";
+import * as authService from "../services/auth.service";
+import prisma from "../prisma";
 import bcrypt from "bcryptjs";
-import { AuthenticatedRequest } from "../middleware/auth.js";
+import { AuthenticatedRequest } from "../middleware/auth";
 
 /*TODO refactor like project controller*/
 export const getCurrentUser = async (

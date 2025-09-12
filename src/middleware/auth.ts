@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
-import { getUserById } from "../services/auth.service.js";
+import { getUserById } from "../services/auth.service";
 
 const JWT_SECRET = process.env.JWT_SECRET || "MeowMeowMeow";
 
