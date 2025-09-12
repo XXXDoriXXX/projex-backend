@@ -39,23 +39,49 @@ export const getProjectById = async (
 	id: string,
 	token?: string,
 	userId?: string,
-) => {
+): Promise<ProjectDto> => {
 	if (!id) {
-		throw new ValidationError(`Project ID is required`, `id`);
+		throw new ValidationError("Project ID is required", "id");
 	}
 
 	try {
-		const project = await prisma.project.findUnique({
-			where: { id },
-			include: {
-				media: true,
-				_count: { select: { likes: true, views: true } },
-				technologies: true,
-			},
-		});
+		const [project, viewsAgg] = await Promise.all([
+			prisma.project.findUnique({
+				where: { id },
+				include: {
+					media: true,
+					technologies: true,
+					_count: { select: { likes: true, views: true } },
+				},
+			}),
+			prisma.view.aggregate({
+				where: { projectId: id },
+				_sum: { count: true },
+			}),
+		]);
+
+		if (!project) {
+			throw new NotFoundError("Project", id);
+		}
 
 		ensureAccess(project, token, userId);
-		return project;
+
+		const viewsTotal = viewsAgg._sum.count ?? 0;
+
+		const { _count: internalCount, ...rest } = project as any;
+
+		const dto: ProjectDto = {
+			...rest,
+			metrics: {
+				likes: internalCount.likes,
+				views: {
+					rows: internalCount.views,
+					total: viewsTotal,
+				},
+			},
+		};
+
+		return dto;
 	} catch (err: any) {
 		throw new DatabaseError(`Failed to fetch project. ${err.message}`, {
 			projectId: id,
@@ -115,7 +141,6 @@ export const updateProject = async (id: string, data: CreateProjectData) => {
 		throw new ValidationError(`User ID is required`, `userId`);
 	}
 
-	// Перевіряємо власника та існування
 	const project = await prisma.project.findUnique({ where: { id } });
 	if (!project) {
 		throw new NotFoundError(`Project`, id);
@@ -339,5 +364,71 @@ export const changeProjectVisibility = async (
 		default: {
 			throw new ValidationError(`Invalid visibility option`, `visible`);
 		}
+	}
+};
+function hashIp(ip: string, salt: string): string {
+	return crypto.createHash("sha256").update(`${ip}${salt}`).digest("hex");
+}
+export const recordProjectView = async (
+	projectId: string,
+	opts?: { userId?: string; ip?: string; ipHash?: string },
+) => {
+	const userId = opts?.userId ?? null;
+
+	if (!projectId) {
+		throw new ValidationError("Project ID is required", "projectId");
+	}
+
+	const project = await prisma.project.findUnique({ where: { id: projectId } });
+	if (!project) {
+		throw new NotFoundError("Project", projectId);
+	}
+
+	try {
+		if (userId) {
+			return await prisma.view.upsert({
+				where: {
+					project_user: { projectId, userId },
+				},
+				create: {
+					projectId,
+					userId,
+					count: 1,
+				},
+				update: {
+					count: { increment: 1 },
+				},
+			});
+		}
+		console.log(opts?.ip);
+		const salt = process.env.IP_HASH_SALT;
+		if (!opts?.ip && !opts?.ipHash) {
+			throw new ValidationError("IP is required for anonymous view", "ip");
+		}
+		if (!salt && !opts?.ipHash) {
+			throw new ValidationError("IP_HASH_SALT is not set", "IP_HASH_SALT");
+		}
+
+		const finalIpHash =
+			opts?.ipHash ?? hashIp(opts!.ip as string, salt as string);
+
+		return await prisma.view.upsert({
+			where: {
+				project_iphash: { projectId, ipHash: finalIpHash },
+			},
+			create: {
+				projectId,
+				ipHash: finalIpHash,
+				count: 1,
+			},
+			update: {
+				count: { increment: 1 },
+			},
+		});
+	} catch (err: any) {
+		throw new DatabaseError("Failed to record project view", {
+			projectId,
+			reason: err?.message,
+		});
 	}
 };

@@ -217,3 +217,34 @@ export const unlikeProject = asyncHandler(
 		res.status(200).json({ success: true, likes });
 	},
 );
+
+export const recordProjectView = asyncHandler(
+	async (req: AuthenticatedRequest, res: Response) => {
+		const projectId = req.params.id;
+		if (!projectId) {
+			throw new ValidationError("Project ID is required", "id");
+		}
+
+		const userId = req.user?.userId ?? undefined;
+
+		const xff = req.headers["x-forwarded-for"] as string | undefined;
+		const ipList = xff?.split(",").map((ip) => ip.trim()) || [];
+
+		const ip = ipList[0] || req.ip;
+
+		const view = await projectService.recordProjectView(projectId, {
+			userId,
+			ip,
+		});
+
+		res.status(200).json({
+			success: true,
+			data: {
+				id: view.id,
+				count: view.count,
+				projectId: view.projectId,
+				userId: view.userId ?? null,
+			},
+		});
+	},
+);

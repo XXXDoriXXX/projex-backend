@@ -11,6 +11,7 @@ import {
 	updateProject,
 	likeProject,
 	unlikeProject,
+	recordProjectView,
 } from "../controllers/project.controller";
 
 const router = Router();
@@ -23,4 +24,5 @@ router.get("/user/:id", getUserProjects);
 router.patch("/visible/:id", authenticate, changeProjectVisibility);
 router.post("/like/:id", authenticate, likeProject);
 router.delete("/like/:id", authenticate, unlikeProject);
+router.post("/view/:id", optionalAuthenticate, recordProjectView);
 export default router;
