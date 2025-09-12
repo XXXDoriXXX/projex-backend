@@ -22,7 +22,7 @@ export const errorHandler = (
 	error: Error,
 	req: Request,
 	res: Response,
-	_next: NextFunction
+	_next: NextFunction,
 ): void => {
 	const requestId = (req as any).requestId;
 
@@ -42,14 +42,14 @@ export const errorHandler = (
 				requestId,
 				timestamp: new Date().toISOString(),
 				path: req.path,
-				method: req.method
+				method: req.method,
 			},
 			...(process.env.NODE_ENV === "development" && error.stack
 				? { stack: error.stack }
 				: {}),
 			...(process.env.NODE_ENV === "development" && (error as any).context
 				? { context: (error as any).context as Record<string, any> }
-				: {})
+				: {}),
 		};
 
 		if (statusCode >= 500) {
@@ -58,14 +58,14 @@ export const errorHandler = (
 				method: req.method,
 				url: req.originalUrl,
 				status: statusCode,
-				stack: error.stack
+				stack: error.stack,
 			});
 		} else {
 			logger.warn(error.message, {
 				requestId,
 				method: req.method,
 				url: req.originalUrl,
-				status: statusCode
+				status: statusCode,
 			});
 		}
 	} else {
@@ -81,11 +81,11 @@ export const errorHandler = (
 				requestId,
 				timestamp: new Date().toISOString(),
 				path: req.path,
-				method: req.method
+				method: req.method,
 			},
 			...(process.env.NODE_ENV !== "production" && error.stack
 				? { stack: error.stack }
-				: {})
+				: {}),
 		};
 
 		logger.error(error.message, {
@@ -93,7 +93,7 @@ export const errorHandler = (
 			method: req.method,
 			url: req.originalUrl,
 			status: 500,
-			stack: error.stack
+			stack: error.stack,
 		});
 	}
 
