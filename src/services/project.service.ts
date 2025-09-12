@@ -1,104 +1,140 @@
-import prisma from "../prisma.js";
-import { CreateProjectData } from "../types/Project.js";
-import { projectFieldValid } from "./utils/projectFieldValid.js";
-import { ProjectVisible } from "../types/ProjectVisible.js";
+import prisma from "../prisma";
+import { CreateProjectData } from "../types/Project";
+import { ProjectVisible } from "../types/ProjectVisible";
+import { projectFieldValid } from "../utils/projectFieldValid";
+import crypto from "crypto";
+import {
+	ValidationError,
+	NotFoundError,
+	ForbiddenError,
+	DatabaseError,
+} from "../errors/CustomErrors";
 
-function canAccess(project: any, token?: string, userId?: string) {
-	if (!project) throw new Error("Project not found");
+type ProjectWithRelations = Awaited<ReturnType<typeof getProjectById>>;
 
-	if (project.privateLinkToken === "private") {
+function ensureAccess(project: any, token?: string, userId?: string): void {
+	if (!project) {
+		throw new NotFoundError(`Project`);
+	}
+
+	if (project.privateLinkToken === `private`) {
 		if (project.userId !== userId) {
-			throw new Error("Access denied. not your project");
+			throw new ForbiddenError(`Access denied: not your project`);
 		}
-		return true;
+		return;
 	}
 
 	if (project.privateLinkToken) {
 		if (project.userId === userId) {
-			return true;
+			return;
 		}
 		if (project.privateLinkToken !== token) {
-			throw new Error("Access denied. invalid token");
+			throw new ForbiddenError(`Access denied: invalid token`);
 		}
-		return true;
+		return;
 	}
-
-	return true;
 }
+
 export const getProjectById = async (
 	id: string,
 	token?: string,
 	userId?: string,
 ) => {
+	if (!id) {
+		throw new ValidationError(`Project ID is required`, `id`);
+	}
+
 	try {
 		const project = await prisma.project.findUnique({
 			where: { id },
 			include: {
 				media: true,
-				_count: {
-					select: { likes: true, views: true },
-				},
+				_count: { select: { likes: true, views: true } },
 				technologies: true,
 			},
 		});
-		canAccess(project, token, userId);
+
+		ensureAccess(project, token, userId);
 		return project;
-	} catch (error: any) {
-		console.error("Error fetching project:", error);
-		throw new Error(`${error}`);
+	} catch (err: any) {
+		throw new DatabaseError(`Failed to fetch project. ${err.message}`, {
+			projectId: id,
+		});
 	}
 };
+
 export const getUserProjects = async (userId: string) => {
+	if (!userId) {
+		throw new ValidationError(`User ID is required`, `userId`);
+	}
+
 	try {
-		const projects = await prisma.project.findMany({
+		return await prisma.project.findMany({
 			where: { userId },
 			include: {
 				media: true,
-				_count: {
-					select: { likes: true, views: true },
-				},
+				_count: { select: { likes: true, views: true } },
 				technologies: true,
 			},
 		});
-		return projects;
-	} catch (error: any) {
-		console.error("Error fetching user's projects:", error);
-		throw new Error("Failed to fetch user's projects");
-	}
-};
-export const deleteProject = async (id: string, userId: string) => {
-	if (!id) throw new Error("Project ID is required");
-	if (!userId) throw new Error("User ID is required");
-	try {
-		const deletedProject = await prisma.project.delete({
-			where: {
-				id_userId: {
-					id,
-					userId,
-				},
-			},
+	} catch (err: any) {
+		throw new DatabaseError(`Failed to fetch user's projects. ${err.message}`, {
+			userId,
 		});
-		return deletedProject;
-	} catch (error) {
-		console.error("Error deleting project:", error);
-		throw new Error("Failed to delete project");
 	}
 };
+
+export const deleteProject = async (id: string, userId: string) => {
+	if (!id) {
+		throw new ValidationError(`Project ID is required`, `id`);
+	}
+	if (!userId) {
+		throw new ValidationError(`User ID is required`, `userId`);
+	}
+
+	try {
+		return await prisma.project.delete({
+			where: { id_userId: { id, userId } },
+		});
+	} catch (err: any) {
+		if (err?.code === `P2025`) {
+			throw new NotFoundError(`Project`, id);
+		}
+		throw new DatabaseError(`Failed to delete project. ${err.message}`, {
+			id,
+			userId,
+		});
+	}
+};
+
 export const updateProject = async (id: string, data: CreateProjectData) => {
+	if (!id) {
+		throw new ValidationError(`Project ID is required`, `id`);
+	}
+	if (!data?.userId) {
+		throw new ValidationError(`User ID is required`, `userId`);
+	}
+
+	// Перевіряємо власника та існування
 	const project = await prisma.project.findUnique({ where: { id } });
 	if (!project) {
-		throw new Error("Project not found");
+		throw new NotFoundError(`Project`, id);
 	}
 	if (project.userId !== data.userId) {
-		throw new Error("You do not have permission to update this project");
+		throw new ForbiddenError(
+			`You do not have permission to update this project`,
+		);
 	}
+
 	await projectFieldValid(data);
+
 	let previewUrlValue: string | null = project.previewUrl;
 	if (!previewUrlValue && data.media && data.media.length > 0) {
 		previewUrlValue = data.media[0].url;
 	}
+
 	try {
-		const updatedProject = await prisma.project.update({
+		return await prisma.project.update({
 			where: { id },
 			data: {
 				userId: data.userId,
@@ -110,7 +146,7 @@ export const updateProject = async (id: string, data: CreateProjectData) => {
 				media: data.media
 					? {
 							deleteMany: {},
-							create: data.media?.map((m) => ({
+							create: data.media.map((m) => ({
 								type: m.type,
 								url: m.url,
 							})),
@@ -118,7 +154,7 @@ export const updateProject = async (id: string, data: CreateProjectData) => {
 					: undefined,
 				technologies: data.technologies
 					? {
-							set: data.technologies?.map((id) => ({ id })) ?? [],
+							set: data.technologies.map((techId) => ({ id: techId })),
 						}
 					: undefined,
 			},
@@ -128,17 +164,26 @@ export const updateProject = async (id: string, data: CreateProjectData) => {
 				technologies: true,
 			},
 		});
-		return updatedProject;
-	} catch (error: any) {
-		console.error("Error updating project:", error);
-		throw new Error("Failed to update project");
+	} catch (err: any) {
+		if (err?.code === `P2002`) {
+			throw new ValidationError(
+				`Project with this title already exists`,
+				`title`,
+			);
+		}
+		throw new DatabaseError(`Failed to update project. ${err.message}`, { id });
 	}
 };
 
 export const createProject = async (data: CreateProjectData) => {
+	if (!data?.userId) {
+		throw new ValidationError(`User ID is required`, `userId`);
+	}
+
 	await projectFieldValid(data);
+
 	try {
-		const newProject = await prisma.project.create({
+		return await prisma.project.create({
 			data: {
 				userId: data.userId,
 				title: data.title,
@@ -165,137 +210,134 @@ export const createProject = async (data: CreateProjectData) => {
 				technologies: true,
 			},
 		});
-		return newProject;
-	} catch (error: any) {
-		if (error.code === "P2002") {
-			throw new Error("Project with this title already exists");
+	} catch (err: any) {
+		if (err?.code === `P2002`) {
+			throw new ValidationError(
+				`Project with this title already exists`,
+				`title`,
+			);
 		}
-		console.error("Error creating project:", error);
-		throw new Error("Failed to create project");
+		throw new DatabaseError(`Failed to create project. ${err.message}`);
 	}
 };
+
 export const getProjectStats = async (id: string) => {
+	if (!id) {
+		throw new ValidationError(`Project ID is required`, `id`);
+	}
+
 	try {
 		const [likes, views] = await Promise.all([
 			prisma.like.count({ where: { projectId: id } }),
 			prisma.view.count({ where: { projectId: id } }),
 		]);
 		return { likes, views };
-	} catch (error) {
-		console.error("Error fetching project stats:", error);
-		throw new Error("Failed to fetch project stats");
+	} catch (_err) {
+		throw new DatabaseError(`Failed to fetch project stats.`, {
+			projectId: id,
+		});
 	}
 };
+
 export const likeProject = async (projectId: string, userId: string) => {
-	if (!projectId) throw new Error("Project ID is required");
-	if (!userId) throw new Error("User ID is required");
+	if (!projectId) {
+		throw new ValidationError(`Project ID is required`, `projectId`);
+	}
+	if (!userId) {
+		throw new ValidationError(`User ID is required`, `userId`);
+	}
+
 	const existing = await prisma.like.findUnique({
-		where: {
-			userId_projectId: { userId, projectId },
-		},
+		where: { userId_projectId: { userId, projectId } },
 	});
 	if (existing) {
-		throw new Error("User has already liked this project");
+		throw new ValidationError(`User has already liked this project`);
 	}
 
 	try {
-		const like = await prisma.like.create({
-			data: {
-				projectId,
-				userId,
-			},
-		});
-		const count = await prisma.like.count({
-			where: { projectId },
-		});
+		await prisma.like.create({ data: { projectId, userId } });
+		const count = await prisma.like.count({ where: { projectId } });
 		return count;
-	} catch (error) {
-		console.error("Error liking project:", error);
-		throw new Error("Failed to like project");
+	} catch (_err) {
+		throw new DatabaseError(`Failed to like project.`, { projectId, userId });
 	}
 };
+
 export const unlikeProject = async (projectId: string, userId: string) => {
-	if (!projectId) throw new Error("Project ID is required");
-	if (!userId) throw new Error("User ID is required");
+	if (!projectId) {
+		throw new ValidationError(`Project ID is required`, `projectId`);
+	}
+	if (!userId) {
+		throw new ValidationError(`User ID is required`, `userId`);
+	}
+
 	const existing = await prisma.like.findUnique({
-		where: {
-			userId_projectId: { userId, projectId },
-		},
+		where: { userId_projectId: { userId, projectId } },
 	});
-
 	if (!existing) {
-		throw new Error("Like not found");
+		throw new NotFoundError(`Like`);
 	}
 
 	try {
-		const unlike = await prisma.like.delete({
-			where: {
-				userId_projectId: {
-					projectId,
-					userId,
-				},
-			},
+		await prisma.like.delete({
+			where: { userId_projectId: { projectId, userId } },
 		});
-		const count = await prisma.like.count({
-			where: { projectId },
-		});
+		const count = await prisma.like.count({ where: { projectId } });
 		return count;
-	} catch (error) {
-		console.error("Error unliking project:", error);
-		throw new Error("Failed to unlike project");
+	} catch (_err) {
+		throw new DatabaseError(`Failed to unlike project`, { projectId, userId });
 	}
 };
-const changeVisibility = async (id: string, visible?: string) => {
+
+const setVisibility = async (id: string, token: string | null) => {
 	try {
-		const updatedProject = await prisma.project.update({
+		return await prisma.project.update({
 			where: { id },
-			data: {
-				privateLinkToken: `${visible}`,
-			},
+			data: { privateLinkToken: token },
 		});
-		return updatedProject;
-	} catch (error: any) {
-		console.error("Error updating project visibility:", error);
-		throw new Error("Failed to update project visibility");
+	} catch (_err) {
+		throw new DatabaseError(`Failed to update project visibility`, { id });
 	}
 };
+
 export const changeProjectVisibility = async (
 	id: string,
 	userId: string,
 	visible: ProjectVisible,
 ) => {
-	const project = await prisma.project.findUnique({ where: { id } });
-	if (!project) {
-		throw new Error("Project not found");
+	if (!id) {
+		throw new ValidationError(`Project ID is required`, `id`);
 	}
-	if (project.userId !== userId) {
-		throw new Error("You do not have permission to update this project");
+	if (!userId) {
+		throw new ValidationError(`User ID is required`, `userId`);
 	}
 	if (!visible) {
-		throw new Error("Visibility option is required");
+		throw new ValidationError(`Visibility option is required`, `visible`);
 	}
-	try {
-		let updatedProject;
-		switch (visible) {
-			case "link":
-				const token = [...Array(30)]
-					.map(() => Math.random().toString(36)[2])
-					.join("");
-				updatedProject = changeVisibility(id, token);
-				break;
-			case "public":
-				updatedProject = changeVisibility(id);
-				break;
-			case "private":
-				updatedProject = changeVisibility(id, "private");
-				break;
-			default:
-				console.log("Error updating project:", id, userId, visible);
-				throw new Error("Invalid visibility option");
+
+	const project = await prisma.project.findUnique({ where: { id } });
+	if (!project) {
+		throw new NotFoundError(`Project`, id);
+	}
+	if (project.userId !== userId) {
+		throw new ForbiddenError(
+			`You do not have permission to update this project`,
+		);
+	}
+
+	switch (visible) {
+		case `link`: {
+			const token = crypto.randomBytes(24).toString(`hex`);
+			return setVisibility(id, token);
 		}
-		return updatedProject;
-	} catch (error: any) {
-		console.error("Error updating project visibility:", error);
-		throw new Error("Failed to update project visibility");
+		case `public`: {
+			return setVisibility(id, null);
+		}
+		case `private`: {
+			return setVisibility(id, `private`);
+		}
+		default: {
+			throw new ValidationError(`Invalid visibility option`, `visible`);
+		}
 	}
 };

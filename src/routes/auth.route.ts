@@ -9,8 +9,8 @@ import {
 	sendVerificationCode,
 	signUp,
 	verifyEmail,
-} from "../controllers/auth.controller.js";
-import { authenticate } from "../middleware/auth.js";
+} from "../controllers/auth.controller";
+import { authenticate } from "../middleware/auth";
 const router = Router();
 
 router.post("/google", googleLogin);

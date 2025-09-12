@@ -122,14 +122,19 @@ model Like {
 model View {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
-  ip        String   @db.Inet
+  updatedAt DateTime @updatedAt
+  count     Int      @default(1)
 
-  userId    String?
+  project   Project @relation(fields: [projectId], references: [id])
   projectId String
 
-  project Project @relation(fields: [projectId], references: [id])
-  user    User?   @relation(fields: [userId], references: [id])
+  user   User?   @relation(fields: [userId], references: [id])
+  userId String?
 
+  ipHash String? //IP (SHA-256(IP+salt))
+
+  @@unique([projectId, userId], name: "project_user")
+  @@unique([projectId, ipHash], name: "project_iphash")
   @@index([projectId])
 }
 

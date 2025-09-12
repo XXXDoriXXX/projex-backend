@@ -1,7 +1,7 @@
 import { Router } from "express";
 
-import { validateProject } from "../middleware/project/validateProject.js";
-import { authenticate, optionalAuthenticate } from "../middleware/auth.js";
+import { validateProject } from "../middleware/project/validateProject";
+import { authenticate, optionalAuthenticate } from "../middleware/auth";
 import {
 	changeProjectVisibility,
 	createProject,
@@ -11,7 +11,7 @@ import {
 	updateProject,
 	likeProject,
 	unlikeProject,
-} from "../controllers/project.controller.js";
+} from "../controllers/project.controller";
 
 const router = Router();
 router.post("/create", validateProject, authenticate, createProject);
