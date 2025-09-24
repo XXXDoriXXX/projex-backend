@@ -10,6 +10,7 @@ import {
 	DatabaseError,
 } from "../errors/CustomErrors";
 import {ensureAccess} from "../utils/encruceAcces";
+import {requireUserIdProjectId} from "../utils/requireUserIdProjectId";
 
 type ProjectWithRelations = Awaited<ReturnType<typeof getProjectById>>;
 
@@ -89,12 +90,7 @@ export const getUserProjects = async (userId: string) => {
 };
 
 export const deleteProject = async (id: string, userId: string) => {
-	if (!id) {
-		throw new ValidationError(`Project ID is required`, `id`);
-	}
-	if (!userId) {
-		throw new ValidationError(`User ID is required`, `userId`);
-	}
+	requireUserIdProjectId(id, userId);
 
 	try {
 		return await prisma.project.delete({
@@ -112,12 +108,8 @@ export const deleteProject = async (id: string, userId: string) => {
 };
 
 export const updateProject = async (id: string, data: CreateProjectData) => {
-	if (!id) {
-		throw new ValidationError(`Project ID is required`, `id`);
-	}
-	if (!data?.userId) {
-		throw new ValidationError(`User ID is required`, `userId`);
-	}
+
+	requireUserIdProjectId(id, data?.userId);
 
 	const project = await prisma.project.findUnique({ where: { id } });
 	if (!project) {
@@ -225,56 +217,6 @@ export const createProject = async (data: CreateProjectData) => {
 };
 
 
-export const likeProject = async (projectId: string, userId: string) => {
-	if (!projectId) {
-		throw new ValidationError(`Project ID is required`, `projectId`);
-	}
-	if (!userId) {
-		throw new ValidationError(`User ID is required`, `userId`);
-	}
-
-	const existing = await prisma.like.findUnique({
-		where: { userId_projectId: { userId, projectId } },
-	});
-	if (existing) {
-		throw new ValidationError(`User has already liked this project`);
-	}
-
-	try {
-		await prisma.like.create({ data: { projectId, userId } });
-		const count = await prisma.like.count({ where: { projectId } });
-		return count;
-	} catch (_err) {
-		throw new DatabaseError(`Failed to like project.`, { projectId, userId });
-	}
-};
-
-export const unlikeProject = async (projectId: string, userId: string) => {
-	if (!projectId) {
-		throw new ValidationError(`Project ID is required`, `projectId`);
-	}
-	if (!userId) {
-		throw new ValidationError(`User ID is required`, `userId`);
-	}
-
-	const existing = await prisma.like.findUnique({
-		where: { userId_projectId: { userId, projectId } },
-	});
-	if (!existing) {
-		throw new NotFoundError(`Like`);
-	}
-
-	try {
-		await prisma.like.delete({
-			where: { userId_projectId: { projectId, userId } },
-		});
-		const count = await prisma.like.count({ where: { projectId } });
-		return count;
-	} catch (_err) {
-		throw new DatabaseError(`Failed to unlike project`, { projectId, userId });
-	}
-};
-
 const setVisibility = async (id: string, token: string | null) => {
 	try {
 		return await prisma.project.update({
@@ -291,12 +233,7 @@ export const changeProjectVisibility = async (
 	userId: string,
 	visible: ProjectVisible,
 ) => {
-	if (!id) {
-		throw new ValidationError(`Project ID is required`, `id`);
-	}
-	if (!userId) {
-		throw new ValidationError(`User ID is required`, `userId`);
-	}
+	requireUserIdProjectId(id, userId);
 	if (!visible) {
 		throw new ValidationError(`Visibility option is required`, `visible`);
 	}
