@@ -16,11 +16,12 @@ import {
 
 const router = Router();
 router.post("/create", validateProject, authenticate, createProject);
+router.get("/user/:id", getUserProjects);
 router.delete("/:id", authenticate, deleteProject);
 router.put("/:id", validateProject, authenticate, updateProject);
-router.get("/:id", optionalAuthenticate, getProjectById);
-router.get("/:id/:token", optionalAuthenticate, getProjectById);
-router.get("/user/:id", getUserProjects);
+router.get("/get/:id", optionalAuthenticate, getProjectById);
+router.get("/get/:id/:token", optionalAuthenticate, getProjectById);
+
 router.patch("/visible/:id", authenticate, changeProjectVisibility);
 router.post("/like/:id", authenticate, likeProject);
 router.delete("/like/:id", authenticate, unlikeProject);

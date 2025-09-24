@@ -53,18 +53,15 @@ export const getProjectById = async (
 
 export const getUserProjects = async (userId: string) => {
 	if (!userId) {
-		throw new ValidationError(`User ID is required`, `userId`);
+		throw new ValidationError(`User ID is required`, `${userId}`);
 	}
-
 	try {
-		return await prisma.project.findMany({
-			where: { userId },
-			include: {
-				media: true,
-				_count: { select: { likes: true, views: true } },
-				technologies: true,
-			},
-		});
+		const projects = await repo.getUserProjects(userId);
+		console.log(projects);
+		if(projects.length === 0){
+			throw new NotFoundError(`User dont have a projects`, `user id:${userId}`);
+		}
+		return projects;
 	} catch (err: any) {
 		throw new DatabaseError(`Failed to fetch user's projects. ${err.message}`, {
 			userId,
@@ -76,9 +73,7 @@ export const deleteProject = async (id: string, userId: string) => {
 	requireUserIdProjectId(id, userId);
 
 	try {
-		return await prisma.project.delete({
-			where: { id_userId: { id, userId } },
-		});
+		return repo.deleteProject(id, userId);
 	} catch (err: any) {
 		if (err?.code === `P2025`) {
 			throw new NotFoundError(`Project`, id);

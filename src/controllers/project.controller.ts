@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as projectService from "../services/project.service";
+import * as projectServiceLike from "../services/project.service.like";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { CreateProjectData } from "../types/Project";
 import { ProjectVisible } from "../types/ProjectVisible";
@@ -145,7 +146,6 @@ export const getProjectById = asyncHandler(
 
 export const getUserProjects = asyncHandler(
 	async (req: Request, res: Response) => {
-		// В роуті /user/:id — тому читаємо саме :id
 		const userId = req.params.id;
 		if (!userId) {
 			throw new ValidationError("User ID is required", "id");
@@ -196,7 +196,7 @@ export const likeProject = asyncHandler(
 			throw new ValidationError("Project ID is required", "id");
 		}
 
-		const likes = await projectService.likeProject(projectId, userId);
+		const likes = await projectServiceLike.likeProject(projectId, userId);
 		res.status(200).json({ success: true, likes });
 	},
 );
@@ -213,7 +213,7 @@ export const unlikeProject = asyncHandler(
 			throw new ValidationError("Project ID is required", "id");
 		}
 
-		const likes = await projectService.unlikeProject(projectId, userId);
+		const likes = await projectServiceLike.unlikeProject(projectId, userId);
 		res.status(200).json({ success: true, likes });
 	},
 );
