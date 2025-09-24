@@ -373,6 +373,7 @@ export const recordProjectView = async (
 	projectId: string,
 	opts?: { userId?: string; ip?: string; ipHash?: string },
 ) => {
+	console.log(opts)
 	const userId = opts?.userId ?? null;
 
 	if (!projectId) {
