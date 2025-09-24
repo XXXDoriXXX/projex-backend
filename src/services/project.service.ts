@@ -9,31 +9,9 @@ import {
 	ForbiddenError,
 	DatabaseError,
 } from "../errors/CustomErrors";
+import {ensureAccess} from "../utils/encruceAcces";
 
 type ProjectWithRelations = Awaited<ReturnType<typeof getProjectById>>;
-
-function ensureAccess(project: any, token?: string, userId?: string): void {
-	if (!project) {
-		throw new NotFoundError(`Project`);
-	}
-
-	if (project.privateLinkToken === `private`) {
-		if (project.userId !== userId) {
-			throw new ForbiddenError(`Access denied: not your project`);
-		}
-		return;
-	}
-
-	if (project.privateLinkToken) {
-		if (project.userId === userId) {
-			return;
-		}
-		if (project.privateLinkToken !== token) {
-			throw new ForbiddenError(`Access denied: invalid token`);
-		}
-		return;
-	}
-}
 
 export const getProjectById = async (
 	id: string,
@@ -246,23 +224,6 @@ export const createProject = async (data: CreateProjectData) => {
 	}
 };
 
-export const getProjectStats = async (id: string) => {
-	if (!id) {
-		throw new ValidationError(`Project ID is required`, `id`);
-	}
-
-	try {
-		const [likes, views] = await Promise.all([
-			prisma.like.count({ where: { projectId: id } }),
-			prisma.view.count({ where: { projectId: id } }),
-		]);
-		return { likes, views };
-	} catch (_err) {
-		throw new DatabaseError(`Failed to fetch project stats.`, {
-			projectId: id,
-		});
-	}
-};
 
 export const likeProject = async (projectId: string, userId: string) => {
 	if (!projectId) {
