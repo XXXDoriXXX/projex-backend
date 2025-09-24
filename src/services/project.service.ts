@@ -11,9 +11,10 @@ import {
 } from "../errors/CustomErrors";
 import {ensureAccess} from "../utils/encruceAcces";
 import {requireUserIdProjectId} from "../utils/requireUserIdProjectId";
+import {ProjectRepository} from "../repositories/project.repository";
 
 type ProjectWithRelations = Awaited<ReturnType<typeof getProjectById>>;
-
+const repo = new ProjectRepository(prisma);
 export const getProjectById = async (
 	id: string,
 	token?: string,
@@ -22,45 +23,27 @@ export const getProjectById = async (
 	if (!id) {
 		throw new ValidationError("Project ID is required", "id");
 	}
-
 	try {
-		const [project, viewsAgg] = await Promise.all([
-			prisma.project.findUnique({
-				where: { id },
-				include: {
-					media: true,
-					technologies: true,
-					_count: { select: { likes: true, views: true } },
-				},
-			}),
-			prisma.view.aggregate({
-				where: { projectId: id },
-				_sum: { count: true },
-			}),
-		]);
-
-		if (!project) {
-			throw new NotFoundError("Project", id);
+		const project = await repo.findById(id);
+		if(!project){
+			throw new NotFoundError(`Project`, id);
 		}
-
 		ensureAccess(project, token, userId);
+		const viewsAgg = await repo.getViewsCount(id);
+		const viewsTotal = viewsAgg?._sum?.count ?? 0;
 
-		const viewsTotal = viewsAgg._sum.count ?? 0;
+		const {_count: internalCount, ...rest} = project as any;
 
-		const { _count: internalCount, ...rest } = project as any;
-
-		const dto: ProjectDto = {
+		return{
 			...rest,
-			metrics: {
+			metrics:{
 				likes: internalCount.likes,
 				views: {
 					rows: internalCount.views,
 					total: viewsTotal,
 				},
-			},
-		};
-
-		return dto;
+			}
+		}
 	} catch (err: any) {
 		throw new DatabaseError(`Failed to fetch project. ${err.message}`, {
 			projectId: id,
