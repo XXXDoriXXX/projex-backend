@@ -1,21 +1,22 @@
 import {requireUserIdProjectId} from "../utils/requireUserIdProjectId";
 import prisma from "../prisma";
-import {DatabaseError, NotFoundError, ValidationError} from "../errors/CustomErrors";
+import {DatabaseError, NotFoundError} from "../errors/CustomErrors";
 
+import {ProjectMetricsRepository} from "../repositories/project.metrics.repository";
+
+const repo = new ProjectMetricsRepository(prisma);
+async function isLikeExist(userId: string, projectId: string) {
+    const existing = await repo.getLikeById(userId, projectId);
+    if (!existing) {
+        throw new NotFoundError(`Like`);
+    }
+}
 export const likeProject = async (projectId: string, userId: string) => {
     requireUserIdProjectId(projectId, userId);
-
-    const existing = await prisma.like.findUnique({
-        where: { userId_projectId: { userId, projectId } },
-    });
-    if (existing) {
-        throw new ValidationError(`User has already liked this project`);
-    }
-
+    await isLikeExist(projectId, userId);
     try {
-        await prisma.like.create({ data: { projectId, userId } });
-        const count = await prisma.like.count({ where: { projectId } });
-        return count;
+        await repo.createLike(userId, projectId);
+        return await repo.getLikesCount(projectId);
     } catch (_err) {
         throw new DatabaseError(`Failed to like project.`, { projectId, userId });
     }
@@ -23,20 +24,10 @@ export const likeProject = async (projectId: string, userId: string) => {
 
 export const unlikeProject = async (projectId: string, userId: string) => {
     requireUserIdProjectId(projectId, userId);
-
-    const existing = await prisma.like.findUnique({
-        where: { userId_projectId: { userId, projectId } },
-    });
-    if (!existing) {
-        throw new NotFoundError(`Like`);
-    }
-
+    await isLikeExist(projectId, userId);
     try {
-        await prisma.like.delete({
-            where: { userId_projectId: { projectId, userId } },
-        });
-        const count = await prisma.like.count({ where: { projectId } });
-        return count;
+        await repo.deleteLike(userId, projectId);
+        return await repo.getLikesCount(projectId);
     } catch (_err) {
         throw new DatabaseError(`Failed to unlike project`, { projectId, userId });
     }

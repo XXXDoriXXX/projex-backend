@@ -1,14 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 import prisma from "../prisma";
-import {NotFoundError} from "../errors/CustomErrors";
-import {ensureAccess} from "../utils/encruceAcces";
 import {CreateProjectData} from "../types/Project";
 
 
 export class ProjectRepository{
     constructor(private prisma: PrismaClient) {}
     async isProjectExists(id: string){
-        return await prisma.project.findUnique({ where: { id } });
+        return  prisma.project.findUnique({ where: { id } });
     }
     async findById(id: string) {
         return prisma.project.findUnique({

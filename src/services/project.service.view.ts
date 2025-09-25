@@ -1,7 +1,10 @@
 import {DatabaseError, NotFoundError, ValidationError} from "../errors/CustomErrors";
 import prisma from "../prisma";
 import {hashIp} from "../utils/hashIp";
-
+import {ProjectRepository} from "../repositories/project.repository";
+import {ProjectMetricsRepository} from "../repositories/project.metrics.repository";
+const repoProject = new ProjectRepository(prisma);
+const repoView = new ProjectMetricsRepository(prisma);
 export const recordProjectView = async (
     projectId: string,
     opts?: { userId?: string; ip?: string; ipHash?: string },
@@ -13,26 +16,14 @@ export const recordProjectView = async (
         throw new ValidationError("Project ID is required", "projectId");
     }
 
-    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    const project = await repoProject.findById(projectId);
     if (!project) {
         throw new NotFoundError("Project", projectId);
     }
 
     try {
         if (userId) {
-            return await prisma.view.upsert({
-                where: {
-                    project_user: { projectId, userId },
-                },
-                create: {
-                    projectId,
-                    userId,
-                    count: 1,
-                },
-                update: {
-                    count: { increment: 1 },
-                },
-            });
+            return await repoView.upsertView(projectId,userId);
         }
         console.log(opts?.ip);
         const salt = process.env.IP_HASH_SALT;
@@ -46,19 +37,7 @@ export const recordProjectView = async (
         const finalIpHash =
             opts?.ipHash ?? hashIp(opts!.ip as string, salt as string);
 
-        return await prisma.view.upsert({
-            where: {
-                project_iphash: { projectId, ipHash: finalIpHash },
-            },
-            create: {
-                projectId,
-                ipHash: finalIpHash,
-                count: 1,
-            },
-            update: {
-                count: { increment: 1 },
-            },
-        });
+        return await repoView.upsertAnonymousView(projectId, finalIpHash);
     } catch (err: any) {
         throw new DatabaseError("Failed to record project view", {
             projectId,
