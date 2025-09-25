@@ -7,7 +7,9 @@ import {CreateProjectData} from "../types/Project";
 
 export class ProjectRepository{
     constructor(private prisma: PrismaClient) {}
-
+    async isProjectExists(id: string){
+        return await prisma.project.findUnique({ where: { id } });
+    }
     async findById(id: string) {
         return prisma.project.findUnique({
             where: { id },
@@ -25,7 +27,7 @@ export class ProjectRepository{
         });
     }
     async getUserProjects(userId: string) {
-        return await prisma.project.findMany({
+        return  prisma.project.findMany({
             where: { userId },
             include: {
                 media: true,
@@ -35,12 +37,12 @@ export class ProjectRepository{
         });
     }
     async deleteProject(id: string, userId: string) {
-        return await prisma.project.delete({
+        return  prisma.project.delete({
             where: { id_userId: { id, userId } },
         });
     }
-    async updateProject(id:string, data: CreateProjectData, previewUrlValue:string | null) {
-        return await prisma.project.update({
+    async updateProject(id: string, previewUrlValue: string | null, data: CreateProjectData) {
+        return  prisma.project.update({
             where: { id },
             data: {
                 userId: data.userId,
@@ -71,7 +73,5 @@ export class ProjectRepository{
             },
         });
     }
-    async getProjectByUserId(userId:string){
-        return await prisma.project.findUnique({ where: { id:userId } });
-    }
+
 }

@@ -73,7 +73,7 @@ export const deleteProject = async (id: string, userId: string) => {
 	requireUserIdProjectId(id, userId);
 
 	try {
-		return repo.deleteProject(id, userId);
+		return await repo.deleteProject(id, userId);
 	} catch (err: any) {
 		if (err?.code === `P2025`) {
 			throw new NotFoundError(`Project`, id);
@@ -89,7 +89,7 @@ export const updateProject = async (id: string, data: CreateProjectData) => {
 
 	requireUserIdProjectId(id, data?.userId);
 
-	const project = await prisma.project.findUnique({ where: { id } });
+	const project =await  repo.isProjectExists(id);
 	if (!project) {
 		throw new NotFoundError(`Project`, id);
 	}
@@ -107,36 +107,7 @@ export const updateProject = async (id: string, data: CreateProjectData) => {
 	}
 
 	try {
-		return await prisma.project.update({
-			where: { id },
-			data: {
-				userId: data.userId,
-				title: data.title,
-				description: data.description,
-				previewUrl: previewUrlValue,
-				githubUrl: data.githubUrl ?? null,
-				demoUrl: data.demoUrl ?? null,
-				media: data.media
-					? {
-							deleteMany: {},
-							create: data.media.map((m) => ({
-								type: m.type,
-								url: m.url,
-							})),
-						}
-					: undefined,
-				technologies: data.technologies
-					? {
-							set: data.technologies.map((techId) => ({ id: techId })),
-						}
-					: undefined,
-			},
-			include: {
-				user: true,
-				media: true,
-				technologies: true,
-			},
-		});
+		return await repo.updateProject(id, previewUrlValue, data);
 	} catch (err: any) {
 		if (err?.code === `P2002`) {
 			throw new ValidationError(
