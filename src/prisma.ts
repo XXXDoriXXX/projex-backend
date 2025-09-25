@@ -1,4 +1,8 @@
 import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-export default prisma;
+import { Service } from "typedi";
+@Service()
+export class PrismaService extends PrismaClient {
+    constructor() {
+        super();
+    }
+}

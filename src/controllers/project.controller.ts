@@ -1,7 +1,4 @@
 import { Request, Response } from "express";
-import * as projectService from "../services/project.service";
-import * as projectServiceLike from "../services/project.service.like";
-import * as projectServiceView from "../services/project.service.view";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { CreateProjectData } from "../types/Project";
 import { ProjectVisible } from "../types/ProjectVisible";
@@ -11,7 +8,13 @@ import {
 	NotFoundError,
 	ForbiddenError,
 } from "../errors/CustomErrors";
-
+import { Container } from 'typedi';
+import {ProjectService} from "../services/project.service";
+import {ProjectServiceLike} from "../services/project.service.like";
+import {ProjectServiceView} from "../services/project.service.view";
+const service = Container.get(ProjectService);
+const serviceLike = Container.get(ProjectServiceLike);
+const serviceView = Container.get(ProjectServiceView);
 const isProjectVisible = (v: unknown): v is ProjectVisible =>
 	v === "public" || v === "link" || v === "private";
 
@@ -58,7 +61,7 @@ export const createProject = asyncHandler(
 			technologies,
 		};
 
-		const project = await projectService.createProject(projectData);
+		const project = await service.createProject(projectData);
 		res
 			.status(201)
 			.json({ success: true, data: project, message: "Project created" });
@@ -77,7 +80,7 @@ export const deleteProject = asyncHandler(
 			throw new ValidationError("Project ID is required", "id");
 		}
 
-		const deleted = await projectService.deleteProject(projectId, userId);
+		const deleted = await service.deleteProject(projectId, userId);
 		res
 			.status(200)
 			.json({ success: true, data: deleted, message: "Project deleted" });
@@ -115,7 +118,7 @@ export const updateProject = asyncHandler(
 			technologies,
 		} as CreateProjectData;
 
-		const updated = await projectService.updateProject(projectId, payload);
+		const updated = await service.updateProject(projectId, payload);
 		res
 			.status(200)
 			.json({ success: true, data: updated, message: "Project updated" });
@@ -132,7 +135,7 @@ export const getProjectById = asyncHandler(
 		const userId = req.user?.userId;
 		const token = req.params.token;
 
-		const project = await projectService.getProjectById(
+		const project = await service.getProjectById(
 			projectId,
 			token,
 			userId,
@@ -152,7 +155,7 @@ export const getUserProjects = asyncHandler(
 			throw new ValidationError("User ID is required", "id");
 		}
 
-		const projects = await projectService.getUserProjects(userId);
+		const projects = await service.getUserProjects(userId);
 		res.status(200).json({ success: true, data: projects });
 	},
 );
@@ -174,7 +177,7 @@ export const changeProjectVisibility = asyncHandler(
 			throw new ValidationError("Invalid visibility option", "visible");
 		}
 
-		const updated = await projectService.changeProjectVisibility(
+		const updated = await service.changeProjectVisibility(
 			projectId,
 			userId,
 			visible,
@@ -197,7 +200,7 @@ export const likeProject = asyncHandler(
 			throw new ValidationError("Project ID is required", "id");
 		}
 
-		const likes = await projectServiceLike.likeProject(projectId, userId);
+		const likes = await serviceLike.likeProject(projectId, userId);
 		res.status(200).json({ success: true, likes });
 	},
 );
@@ -214,7 +217,7 @@ export const unlikeProject = asyncHandler(
 			throw new ValidationError("Project ID is required", "id");
 		}
 
-		const likes = await projectServiceLike.unlikeProject(projectId, userId);
+		const likes = await serviceLike.unlikeProject(projectId, userId);
 		res.status(200).json({ success: true, likes });
 	},
 );
@@ -233,7 +236,7 @@ export const recordProjectView = asyncHandler(
 
 		const ip = ipList[0] || req.ip;
 
-		const view = await projectServiceView.recordProjectView(projectId, {
+		const view = await serviceView.recordProjectView(projectId, {
 			userId,
 			ip,
 		});

@@ -1,15 +1,16 @@
-import { PrismaClient } from "@prisma/client";
-import prisma from "../prisma";
+
+import {Inject, Service} from 'typedi';
 import {CreateProjectData} from "../types/Project";
+import {PrismaService} from "../prisma";
 
-
+@Service()
 export class ProjectRepository{
-    constructor(private prisma: PrismaClient) {}
+    constructor(@Inject() private prisma: PrismaService) {}
     async isProjectExists(id: string){
-        return  prisma.project.findUnique({ where: { id } });
+        return  this.prisma.project.findUnique({ where: { id } });
     }
     async findById(id: string) {
-        return prisma.project.findUnique({
+        return this.prisma.project.findUnique({
             where: { id },
                 include: {
                     media: true,
@@ -25,7 +26,7 @@ export class ProjectRepository{
         });
     }
     async getUserProjects(userId: string) {
-        return  prisma.project.findMany({
+        return  this.prisma.project.findMany({
             where: { userId },
             include: {
                 media: true,
@@ -35,12 +36,12 @@ export class ProjectRepository{
         });
     }
     async deleteProject(id: string, userId: string) {
-        return  prisma.project.delete({
+        return  this.prisma.project.delete({
             where: { id_userId: { id, userId } },
         });
     }
     async updateProject(id: string, previewUrlValue: string | null, data: CreateProjectData) {
-        return  prisma.project.update({
+        return  this.prisma.project.update({
             where: { id },
             data: {
                 userId: data.userId,
@@ -72,7 +73,7 @@ export class ProjectRepository{
         });
     }
     async createProject(data: CreateProjectData) {
-        return prisma.project.create({
+        return this.prisma.project.create({
             data: {
                 userId: data.userId,
                 title: data.title,
@@ -101,7 +102,7 @@ export class ProjectRepository{
         });
     }
     async updateVisibility(id: string, token: string | null) {
-        return prisma.project.update({
+        return this.prisma.project.update({
             where: { id },
             data: { privateLinkToken: token },
         });
