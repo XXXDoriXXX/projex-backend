@@ -73,5 +73,40 @@ export class ProjectRepository{
             },
         });
     }
+    async createProject(data: CreateProjectData) {
+        return prisma.project.create({
+            data: {
+                userId: data.userId,
+                title: data.title,
+                description: data.description,
+                githubUrl: data.githubUrl ?? null,
+                demoUrl: data.demoUrl ?? null,
+                media: data.media
+                    ? {
+                        create: data.media.map((m) => ({
+                            type: m.type,
+                            url: m.url,
+                        })),
+                    }
+                    : undefined,
+                technologies: data.technologies
+                    ? {
+                        connect: data.technologies.map((id) => ({ id })),
+                    }
+                    : undefined,
+            },
+            include: {
+                user: true,
+                media: true,
+                technologies: true,
+            },
+        });
+    }
+    async updateVisibility(id: string, token: string | null) {
+        return prisma.project.update({
+            where: { id },
+            data: { privateLinkToken: token },
+        });
+    }
 
 }

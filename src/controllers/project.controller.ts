@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as projectService from "../services/project.service";
 import * as projectServiceLike from "../services/project.service.like";
+import * as projectServiceView from "../services/project.service.view";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { CreateProjectData } from "../types/Project";
 import { ProjectVisible } from "../types/ProjectVisible";
@@ -232,7 +233,7 @@ export const recordProjectView = asyncHandler(
 
 		const ip = ipList[0] || req.ip;
 
-		const view = await projectService.recordProjectView(projectId, {
+		const view = await projectServiceView.recordProjectView(projectId, {
 			userId,
 			ip,
 		});
