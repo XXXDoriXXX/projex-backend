@@ -1,4 +1,4 @@
-import {ForbiddenError, NotFoundError} from "../errors/CustomErrors";
+import { ForbiddenError, NotFoundError } from '../errors/CustomErrors';
 
 export function ensureAccess(project: any, token?: string, userId?: string): void {
     if (!project) {

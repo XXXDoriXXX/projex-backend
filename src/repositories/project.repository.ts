@@ -1,22 +1,21 @@
-
-import {Inject, Service} from 'typedi';
-import {CreateProjectData} from "../types/Project";
-import {PrismaService} from "../prisma";
+import { Inject, Service } from 'typedi';
+import { CreateProjectData } from '../types/Project';
+import { PrismaService } from '../prisma';
 
 @Service()
-export class ProjectRepository{
+export class ProjectRepository {
     constructor(@Inject() private prisma: PrismaService) {}
-    async isProjectExists(id: string){
-        return  this.prisma.project.findUnique({ where: { id } });
+    async isProjectExists(id: string) {
+        return this.prisma.project.findUnique({ where: { id } });
     }
     async findById(id: string) {
         return this.prisma.project.findUnique({
             where: { id },
-                include: {
-                    media: true,
-                    technologies: true,
-                    _count: { select: { likes: true, views: true } },
-                },
+            include: {
+                media: true,
+                technologies: true,
+                _count: { select: { likes: true, views: true } },
+            },
         });
     }
     async getViewsCount(projectId: string) {
@@ -26,7 +25,7 @@ export class ProjectRepository{
         });
     }
     async getUserProjects(userId: string) {
-        return  this.prisma.project.findMany({
+        return this.prisma.project.findMany({
             where: { userId },
             include: {
                 media: true,
@@ -36,12 +35,12 @@ export class ProjectRepository{
         });
     }
     async deleteProject(id: string, userId: string) {
-        return  this.prisma.project.delete({
+        return this.prisma.project.delete({
             where: { id_userId: { id, userId } },
         });
     }
     async updateProject(id: string, previewUrlValue: string | null, data: CreateProjectData) {
-        return  this.prisma.project.update({
+        return this.prisma.project.update({
             where: { id },
             data: {
                 userId: data.userId,
@@ -52,17 +51,17 @@ export class ProjectRepository{
                 demoUrl: data.demoUrl ?? null,
                 media: data.media
                     ? {
-                        deleteMany: {},
-                        create: data.media.map((m) => ({
-                            type: m.type,
-                            url: m.url,
-                        })),
-                    }
+                          deleteMany: {},
+                          create: data.media.map((m) => ({
+                              type: m.type,
+                              url: m.url,
+                          })),
+                      }
                     : undefined,
                 technologies: data.technologies
                     ? {
-                        set: data.technologies.map((techId) => ({ id: techId })),
-                    }
+                          set: data.technologies.map((techId) => ({ id: techId })),
+                      }
                     : undefined,
             },
             include: {
@@ -82,16 +81,16 @@ export class ProjectRepository{
                 demoUrl: data.demoUrl ?? null,
                 media: data.media
                     ? {
-                        create: data.media.map((m) => ({
-                            type: m.type,
-                            url: m.url,
-                        })),
-                    }
+                          create: data.media.map((m) => ({
+                              type: m.type,
+                              url: m.url,
+                          })),
+                      }
                     : undefined,
                 technologies: data.technologies
                     ? {
-                        connect: data.technologies.map((id) => ({ id })),
-                    }
+                          connect: data.technologies.map((id) => ({ id })),
+                      }
                     : undefined,
             },
             include: {
@@ -107,5 +106,4 @@ export class ProjectRepository{
             data: { privateLinkToken: token },
         });
     }
-
 }

@@ -1,9 +1,6 @@
-import {ValidationError} from "../errors/CustomErrors";
+import { ValidationError } from '../errors/CustomErrors';
 
-export function requireUserIdProjectId(
-    projectId: string,
-    userId: string,
-) {
+export function requireUserIdProjectId(projectId: string, userId: string) {
     if (!projectId) {
         throw new ValidationError(`Project ID is required`, `projectId`);
     }
