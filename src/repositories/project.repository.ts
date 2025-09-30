@@ -1,15 +1,31 @@
-import { Inject, Service } from 'typedi';
-import { CreateProjectData } from '../types/Project';
-import { PrismaService } from '../prisma';
 
-@Service()
-export class ProjectRepository {
-    constructor(@Inject() private prisma: PrismaService) {}
+import { CreateProjectData } from '../types/project/Project';
+import {prisma} from "../prisma";
+import {Project} from "@prisma/client";
+import {ProjectExists, ProjectWithDetails, ViewsAggregation} from "../types/project/project.types";
+import {CreatedProject} from "../types/project/ProjectCreate";
+import { injectable } from 'tsyringe';
+export interface IProjectRepository {
+    isProjectExists(id: string): Promise<ProjectExists>;
+    findById(id: string): Promise<ProjectWithDetails | null>;
+    getViewsCount(projectId: string): Promise<ViewsAggregation>;
+    getUserProjects(userId: string): Promise<ProjectWithDetails[]>;
+    deleteProject(id: string, userId: string): Promise<Project>;
+    updateProject(
+        id: string,
+        previewUrlValue: string | null,
+        data: CreateProjectData
+    ): Promise<CreatedProject>;
+    createProject(data: CreateProjectData): Promise<CreatedProject>;
+    updateVisibility(id: string, token: string | null): Promise<Project>;
+}
+@injectable()
+export class ProjectRepository implements IProjectRepository{
     async isProjectExists(id: string) {
-        return this.prisma.project.findUnique({ where: { id } });
+        return prisma.project.findUnique({ where: { id } });
     }
-    async findById(id: string) {
-        return this.prisma.project.findUnique({
+    async findById(id: string): Promise<ProjectWithDetails | null> {
+        return prisma.project.findUnique({
             where: { id },
             include: {
                 media: true,
@@ -18,14 +34,14 @@ export class ProjectRepository {
             },
         });
     }
-    async getViewsCount(projectId: string) {
-        return this.prisma.view.aggregate({
+    async getViewsCount(projectId: string): Promise<ViewsAggregation> {
+        return prisma.view.aggregate({
             where: { projectId: projectId },
             _sum: { count: true },
         });
     }
-    async getUserProjects(userId: string) {
-        return this.prisma.project.findMany({
+    async getUserProjects(userId: string): Promise<ProjectWithDetails[]> {
+        return prisma.project.findMany({
             where: { userId },
             include: {
                 media: true,
@@ -34,13 +50,13 @@ export class ProjectRepository {
             },
         });
     }
-    async deleteProject(id: string, userId: string) {
-        return this.prisma.project.delete({
+    async deleteProject(id: string, userId: string): Promise<Project> {
+        return prisma.project.delete({
             where: { id_userId: { id, userId } },
         });
     }
-    async updateProject(id: string, previewUrlValue: string | null, data: CreateProjectData) {
-        return this.prisma.project.update({
+    async updateProject(id: string, previewUrlValue: string | null, data: CreateProjectData):Promise<CreatedProject> {
+        return prisma.project.update({
             where: { id },
             data: {
                 userId: data.userId,
@@ -71,8 +87,8 @@ export class ProjectRepository {
             },
         });
     }
-    async createProject(data: CreateProjectData) {
-        return this.prisma.project.create({
+    async createProject(data: CreateProjectData):Promise<CreatedProject> {
+        return prisma.project.create({
             data: {
                 userId: data.userId,
                 title: data.title,
@@ -101,7 +117,7 @@ export class ProjectRepository {
         });
     }
     async updateVisibility(id: string, token: string | null) {
-        return this.prisma.project.update({
+        return prisma.project.update({
             where: { id },
             data: { privateLinkToken: token },
         });

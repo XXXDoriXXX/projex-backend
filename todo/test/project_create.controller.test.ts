@@ -1,9 +1,9 @@
 import express from 'express';
 import request from 'supertest';
-import { createProject } from '../project.controller';
+import { createProject } from '../../src/controllers/project.controller';
 import jwt from 'jsonwebtoken';
-import { authenticate } from '../../middleware/auth';
-import { validateProject } from '../../middleware/project/validateProject';
+import { authenticate } from '../../src/middleware/auth';
+import { validateProject } from '../../src/middleware/project/validateProject';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'MeowMeowMeow';
 

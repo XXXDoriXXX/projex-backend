@@ -1,4 +1,4 @@
-import prisma from '../prisma';
+import { PrismaService } from '../src/prisma';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
@@ -11,6 +11,7 @@ const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
 const resend = new Resend(process.env.RESEND_API_KEY || '');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const prisma = new PrismaService;
 export const getUserById = async (id: string) => {
     return prisma.user.findUnique({
         where: { id },

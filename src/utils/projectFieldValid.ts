@@ -1,6 +1,7 @@
-import { CreateProjectData } from '../types/Project';
-import prisma from '../prisma';
+import { CreateProjectData } from '../types/project/Project';
+
 import { isValidUrl } from './urlValid';
+import {prisma} from "../prisma";
 
 export const projectFieldValid = async (data: CreateProjectData) => {
     if (!data.title || typeof data.title !== 'string') {

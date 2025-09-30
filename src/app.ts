@@ -1,9 +1,11 @@
+import 'reflect-metadata';
+import './di/projectContainer';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 
 import statusRoute from './routes/status.route';
-import authRoute from './routes/auth.route';
+//import authRoute from './routes/auth.route';
 import projectRoute from './routes/project.route';
 
 import { requestId } from './middleware/request-id';
@@ -52,7 +54,7 @@ app.use(cors(corsOptions));
 app.use(httpLogger);
 
 app.use('/api/status', statusRoute);
-app.use('/api/auth', authRoute);
+//app.use('/api/auth', authRoute);
 app.use('/api/project', projectRoute);
 
 app.get('/', (_req, res) => {

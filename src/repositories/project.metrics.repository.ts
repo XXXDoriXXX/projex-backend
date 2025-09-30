@@ -1,27 +1,36 @@
-import { PrismaService } from '../prisma';
-import { Service, Inject } from 'typedi';
-@Service()
-export class ProjectMetricsRepository {
-    constructor(@Inject() private prisma: PrismaService) {}
 
-    async getLikeById(userId: string, projectId: string) {
-        return this.prisma.like.findUnique({
+
+import {prisma} from "../prisma";
+import {injectable} from "tsyringe";
+import {Like, View} from "@prisma/client";
+export interface IProjectMetricsRepository {
+    getLikeById(userId: string, projectId: string): Promise<Like | null>;
+    createLike(userId: string, projectId: string): Promise<Like>;
+    getLikesCount(projectId: string): Promise<number>;
+    deleteLike(userId: string, projectId: string): Promise<Like>;
+    upsertView(projectId: string, userId: string): Promise<View>;
+    upsertAnonymousView(projectId: string, ipAddress: string): Promise<View>;
+}
+@injectable()
+export class ProjectMetricsRepository implements IProjectMetricsRepository{
+    async getLikeById(userId: string, projectId: string):Promise<Like | null>  {
+        return prisma.like.findUnique({
             where: { userId_projectId: { userId, projectId } },
         });
     }
-    async createLike(userId: string, projectId: string) {
-        return this.prisma.like.create({ data: { projectId, userId } });
+    async createLike(userId: string, projectId: string):Promise<Like>  {
+        return prisma.like.create({ data: { projectId, userId } });
     }
-    async getLikesCount(projectId: string) {
-        return this.prisma.like.count({ where: { projectId } });
+    async getLikesCount(projectId: string):Promise<number>  {
+        return prisma.like.count({ where: { projectId } });
     }
-    async deleteLike(userId: string, projectId: string) {
-        this.prisma.like.delete({
+    async deleteLike(userId: string, projectId: string):Promise<Like>  {
+       return prisma.like.delete({
             where: { userId_projectId: { projectId, userId } },
         });
     }
-    async upsertView(projectId: string, userId: string) {
-        return this.prisma.view.upsert({
+    async upsertView(projectId: string, userId: string):Promise<View>  {
+        return prisma.view.upsert({
             where: {
                 project_user: { projectId, userId },
             },
@@ -35,8 +44,8 @@ export class ProjectMetricsRepository {
             },
         });
     }
-    async upsertAnonymousView(projectId: string, ipAddress: string) {
-        return this.prisma.view.upsert({
+    async upsertAnonymousView(projectId: string, ipAddress: string):Promise<View>  {
+        return prisma.view.upsert({
             where: {
                 project_iphash: { projectId, ipHash: ipAddress },
             },

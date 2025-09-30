@@ -1,10 +1,10 @@
 import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import { authenticate } from '../../middleware/auth';
-import { deleteProject } from '../project.controller';
+import { authenticate } from '../../src/middleware/auth';
+import { deleteProject } from '../../src/controllers/project.controller';
 
-jest.mock('../../services/auth.service', () => ({
+jest.mock('../auth.service', () => ({
     deleteProject: jest.fn().mockResolvedValue({
         id: 'cmf1e5cwa0003c62s8b52zde3',
         title: 'Test Project2',
@@ -31,7 +31,7 @@ describe('DELETE /api/project/:id', () => {
     });
 
     it('should return 404 if project not found', async () => {
-        const mockService = require('../../services/auth.service');
+        const mockService = require('../auth.service');
         mockService.deleteProject.mockRejectedValueOnce(new Error('Project not found'));
 
         const res = await request(app).delete('/api/project/missing123').set('Authorization', `Bearer ${testToken}`);
@@ -41,7 +41,7 @@ describe('DELETE /api/project/:id', () => {
     });
 
     it('should return 403 if unauthorized', async () => {
-        const mockService = require('../../services/auth.service');
+        const mockService = require('../auth.service');
         mockService.deleteProject.mockRejectedValueOnce(new Error('Unauthorized'));
 
         const res = await request(app).delete('/api/project/cmf1e5cwa0003c62s8b52zde3').set('Authorization', `Bearer ${testToken}`);

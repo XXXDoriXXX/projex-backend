@@ -1,4 +1,5 @@
 //route -> controller -> service -> prisma
+import 'reflect-metadata';
 import app from './app';
 import dotenv from 'dotenv';
 

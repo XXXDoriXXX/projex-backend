@@ -1,7 +1,13 @@
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
-import { getUserById } from '../services/auth.service';
+import {prisma} from "../prisma";
 
+export const getUserById = async (id: string) => {
+    return prisma.user.findUnique({
+        where: { id },
+        select: { id: true, username: true, email: true },
+    });
+};
 const JWT_SECRET = process.env.JWT_SECRET || 'MeowMeowMeow';
 
 export interface AuthenticatedRequest extends Request {
