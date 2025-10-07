@@ -53,6 +53,7 @@
         "routing-controllers": "^0.11.3",
         "supertest": "^7.1.4",
         "tsyringe": "^4.10.0",
-        "winston": "^3.17.0"
+        "winston": "^3.17.0",
+        "zod": "^4.1.11"
     }
 }

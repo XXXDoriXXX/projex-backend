@@ -8,11 +8,17 @@ import { ensureAccess } from '../utils/encruceAcces';
 import { requireUserIdProjectId } from '../utils/requireUserIdProjectId';
 import {type IProjectRepository, ProjectRepository} from '../repositories/project.repository';
 import {inject, injectable} from "tsyringe";
-import {Project} from "@prisma/client";
-import {type ProjectResponseDto} from "../DTO/project/ProjectResponse";
+import {Project, ProjectMedia, Technology, User} from "@prisma/client";
+
 
 export interface IProjectService {
-    getProjectById(id: string, token?: string, userId?: string): Promise<ProjectResponseDto>;
+    getProjectById(id: string, token?: string, userId?: string): Promise<{
+        media: ProjectMedia[];
+        technologies: Technology[];
+        user?: User;
+        likesCount: number;
+        viewsCount: number
+    }>;
     getUserProjects(userId: string): Promise<Project[]>;
     deleteProject(id: string, userId: string): Promise<Project>;
     updateProject(id: string, data: CreateProjectData): Promise<Project>;
@@ -27,7 +33,13 @@ export class ProjectService implements IProjectService{
         @inject("IProjectRepository") private repo: IProjectRepository,
     ) {}
 
-    async getProjectById(id: string, token?: string, userId?: string):Promise<ProjectResponseDto> {
+    async getProjectById(id: string, token?: string, userId?: string):Promise<{
+        media: ProjectMedia[];
+        technologies: Technology[];
+        user?: User;
+        likesCount: number;
+        viewsCount: number
+    }> {
         try {
             const project = await this.repo.findById(id);
 

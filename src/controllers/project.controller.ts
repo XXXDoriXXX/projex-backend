@@ -106,7 +106,7 @@ export class ProjectController {
         res.status(200).json({ success: true, data: updated, message: 'Project updated' });
     });
 
-    public getProjectById = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+     public getProjectById = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
         const projectId = req.params.id;
         if (!projectId) {
             throw new ValidationError('Project ID is required', 'id');
