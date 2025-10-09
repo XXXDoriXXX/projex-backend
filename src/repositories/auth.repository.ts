@@ -1,13 +1,15 @@
 import {prisma} from "../prisma";
-import {User} from "@prisma/client";
+import {Prisma, User} from "@prisma/client";
 import {injectable} from "tsyringe";
-import {UpdateUserData} from "../types/user/UserProfile";
+import {UserProfile} from "../types/user/UserProfile";
 export interface IAuthRepository {
     createUser(username:string,email: string, passwordHash: string): Promise<User>;
     getUserByEmail(email:string): Promise<User | null>;
     getUserById(id:string): Promise<User | null>;
-    updateUser(id: string, data: UpdateUserData): Promise<User>;
+    updateUser(id: string, data: Prisma.UserUpdateInput): Promise<UserProfile>;
     deleteUser(id: string): Promise<User>;
+    addVerificationCode(email:string, code:string): Promise<User>;
+    addResetCode(email:string, code:string): Promise<User>;
     getByEmailVerificationToken(token: string): Promise<User | null>;
 }
 @injectable()
@@ -18,6 +20,24 @@ export class AuthRepository implements IAuthRepository {
                 username,
                 email,
                 password: passwordHash,
+            },
+        });
+    }
+    async addVerificationCode(email:string, code:string): Promise<User> {
+        return prisma.user.update({
+            where: { email },
+            data: {
+                emailVerificationToken: code,
+                emailVerificationExpires: new Date(Date.now() + 10 * 60 * 1000),
+            },
+        });
+    }
+    async addResetCode(email:string, code:string): Promise<User> {
+        return prisma.user.update({
+            where: { email },
+            data: {
+                passwordResetToken: code,
+                passwordResetExpires: new Date(Date.now() + 10 * 60 * 1000),
             },
         });
     }
@@ -35,8 +55,9 @@ export class AuthRepository implements IAuthRepository {
             }
         });
     }
-    async updateUser(id: string, data: UpdateUserData): Promise<User> {
-        return prisma.user.update({ where: { id }, data });
+    async updateUser(id: string, data: Prisma.UserUpdateInput): Promise<UserProfile> {
+        const user = await prisma.user.update({ where: { id }, data });
+        return user as UserProfile;
     }
 
     async deleteUser(id: string): Promise<User> {

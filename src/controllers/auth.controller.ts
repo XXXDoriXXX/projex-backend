@@ -5,6 +5,7 @@ import {Request, Response} from "express";
 import {AuthenticatedRequest} from "../middleware/auth";
 import {ValidationError} from "../errors/CustomErrors";
 import {ForbiddenError} from "routing-controllers";
+import {UserProfile} from "../types/user/UserProfile";
 
 @injectable()
 export class authController {
@@ -13,7 +14,15 @@ export class authController {
         const userId = req.user?.userId;
         if (typeof userId === "string") {
             const user = await this.authService.getUserById(userId);
-            res.status(200).json({ success: true, data: user, message: 'User fetched' });
+            const userProfile: UserProfile = {
+                    id: user.id,
+                    username: user.username,
+                    email: user.email,
+                    bio: user.bio ?? undefined,
+                    avatarUrl: user.avatarUrl ?? undefined,
+                    isVerified: user.isVerified,
+                };
+            res.status(200).json({ success: true, data: userProfile, message: 'User fetched' });
         }
     });
     public login = asyncHandler(async (req: Request, res: Response) => {
@@ -21,13 +30,58 @@ export class authController {
         if (typeof email !== "string" || typeof password !== "string") {
           throw new ValidationError("Email and password are required", "email/password");
         }
-        try {
             const result = await this.authService.login(email, password);
+
             res.status(200).json({ success: true, ...result, message: 'Login successful' });
-        } catch (error: any) {
-            throw new ForbiddenError(error);
-        }
     })
+    public register = asyncHandler(async (req: Request, res: Response) => {
+        const { username, email, password } = req.body;
+        if (typeof email !== "string" || typeof password !== "string" || typeof username !== "string") {
+            throw new ValidationError("Username, email and password are required", "username/email/password");
+        }
+            const result = await this.authService.register(username, email, password);
+            res.status(201).json({ success: true, ...result, message: 'Registration successful' });
+    })
+    public verifyEmail = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+        const userId = req.user?.userId;
+        const { code } = req.body;
+        if (typeof userId !== "string" || typeof code !== "string") {
+            throw new ValidationError("Email and code are required", "email/code");
+        }
+            const isVerified = await this.authService.verifyEmail(userId, code);
+            if (isVerified) {
+                res.status(200).json({ success: true, message: 'Email verified successfully' });
+            } else {
+                throw new ForbiddenError('Invalid verification code');
+            }
+    })
+    public sendVerificationCode = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+        const userId = req.user?.userId;
+        if (typeof userId !== "string") {
+            throw new ValidationError("User ID is required", "userId");
+        }
+
+            await this.authService.sendVerificationEmail(userId);
+            res.status(200).json({ success: true, message: 'Verification code sent successfully' });
+    });
+    public sendPasswordResetCode = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+        const userId = req.user?.userId;
+        if (typeof userId !== "string") {
+            throw new ValidationError("User ID is required", "userId");
+        }
+        const { password } = req.body;
+            await this.authService.sendResetPasswordEmail(userId,password);
+            res.status(200).json({ success: true, message: 'Password reset code sent successfully' });
+    });
+    public resetPassword = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+        const userId = req.user?.userId;
+        const { code, newPassword } = req.body;
+        if (typeof userId !== "string" || typeof code !== "string" || typeof newPassword !== "string") {
+            throw new ValidationError("User ID, code and new password are required", "userId/code/newPassword");
+        }
+            await this.authService.resetPassword(userId, code, newPassword);
+            res.status(200).json({ success: true, message: 'Password reset successfully' });
+    });
 }
 
 

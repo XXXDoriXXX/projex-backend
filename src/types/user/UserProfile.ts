@@ -1,10 +1,12 @@
-export interface UpdateUserData {
-    githubId?: string;
+export interface UserProfile {
+    id?: string;
+    username?: string;
+    email?: string;
+    bio?: string;
     avatarUrl?: string;
     isVerified?: boolean;
-    password?: string;
-    passwordResetToken?: string | null;
-    passwordResetExpires?: Date | null;
-    emailVerificationToken?: string | null;
-    emailVerificationExpires?: Date | null;
+    emailVerificationToken?: string;
+    emailVerificationExpires?: Date;
+    isActive?: boolean;
+    passwordHash?: string;
 }
