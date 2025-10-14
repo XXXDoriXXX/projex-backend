@@ -82,6 +82,22 @@ export class authController {
             await this.authService.resetPassword(userId, code, newPassword);
             res.status(200).json({ success: true, message: 'Password reset successfully' });
     });
+    public googleAuth = asyncHandler(async (req: Request, res: Response) => {
+        const { idToken } = req.body;
+        if (typeof idToken !== "string") {
+            throw new ValidationError("Token is required", "token");
+        }
+            const result = await this.authService.googleAuth(idToken);
+            res.status(200).json({ success: true, ...result, message: 'Login successful' });
+    });
+    public githubAuth = asyncHandler(async (req: Request, res: Response) => {
+        const code = req.query.code as string;
+        if (typeof code !== "string") {
+            throw new ValidationError("Code is required", "code");
+        }
+            const result = await this.authService.githubAuth(code);
+            res.status(200).json({ success: true, ...result, message: 'Login successful' });
+    });
 }
 
 

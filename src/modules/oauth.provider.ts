@@ -2,51 +2,61 @@
 import { injectable } from "tsyringe";
 import { OAuth2Client } from "google-auth-library";
 import axios from "axios";
+import {ValidationError} from "../errors/CustomErrors";
+import {OAuthProfile, OAuthProvider} from "../types/auth/OAuth";
 
 export interface IGoogleOAuthProvider {
-    verifyIdToken(idToken: string): Promise<{ email: string; sub: string }>;
+    verify(code: string): Promise<OAuthProfile>;
 }
 
 export interface IGithubOAuthProvider {
-    exchangeCode(code: string): Promise<{ accessToken: string }>;
-    getUser(accessToken: string): Promise<{ id: string; login: string; avatar_url?: string; email?: string }>;
+    verify(code: string): Promise<OAuthProfile>;
 }
 
 @injectable()
-export class GoogleOAuthProvider implements IGoogleOAuthProvider {
+export class GoogleOAuthProvider implements OAuthProvider {
     private client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-    async verifyIdToken(idToken: string) {
+    async verify(idToken: string): Promise<OAuthProfile>  {
         const ticket = await this.client.verifyIdToken({ idToken, audience: process.env.GOOGLE_CLIENT_ID });
         const payload = ticket.getPayload();
-        if (!payload?.email || !payload?.sub) throw new Error("Invalid Google token");
-        return { email: payload.email, sub: payload.sub };
+        if (!payload?.email || !payload?.sub) throw new ValidationError("Invalid Google token");
+        return {
+            email: payload.email,
+            name: payload.name ?? payload.email.split("@")[0],
+            avatar: payload.picture,
+            provider: "google",
+            providerId: payload.sub,
+        };
     }
 }
-
 @injectable()
-export class GithubOAuthProvider implements IGithubOAuthProvider {
+export class GithubOAuthProvider implements OAuthProvider {
     private clientId = process.env.GITHUB_CLIENT_ID!;
     private clientSecret = process.env.GITHUB_CLIENT_SECRET!;
-
-    async exchangeCode(code: string) {
-        const resp = await axios.post(
+    async verify(code:string): Promise<OAuthProfile> {
+        const tokenResp = await axios.post(
             "https://github.com/login/oauth/access_token",
             { client_id: this.clientId, client_secret: this.clientSecret, code },
             { headers: { Accept: "application/json" } }
-        );
-        if (!resp.data.access_token) throw new Error("GitHub auth failed");
-        return { accessToken: resp.data.access_token as string };
-    }
-
-    async getUser(accessToken: string) {
-        const me = await axios.get("https://api.github.com/user", {
-            headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        )
+        const token = tokenResp.data.accessToken;
+        if (!token) throw new ValidationError("Invalid GitHub code");
+        const [userRes, emailRes] = await Promise.all([
+            axios.get("https://api.github.com/user", {
+                headers: { Authorization: `token ${token}` } }),
+            axios.get("https://api.github.com/user/emails", {
+                headers: { Authorization: `token ${token}` }
+            })
+        ]);
+        const email = emailRes.data.find((e: any) => e.primary && e.verified)?.email;
+        if(!email) throw new ValidationError("No verified email found in GitHub account");
+        const u = userRes.data;
         return {
-            id: String(me.data.id),
-            login: me.data.login as string,
-            avatar_url: me.data.avatar_url as string | undefined,
-            email: me.data.email as string | undefined,
-        };
+            email,
+            name: u.name ?? u.login,
+            avatar: u.avatar_url,
+            provider: "github",
+            providerId: u.id.toString(),
+        }
     }
 }

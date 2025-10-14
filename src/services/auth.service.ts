@@ -8,6 +8,8 @@ import {User} from "@prisma/client";
 import {ForbiddenError, NotFoundError} from "routing-controllers";
 import {generateToken} from "../utils/generateToken";
 import {ValidationError} from "../errors/CustomErrors";
+import {type IGoogleOAuthProvider} from "../modules/oauth.provider";
+import {type IOAuthService} from "./oauth.service";
 
 
 const MINUTES = (m: number) => m * 60 * 1000;
@@ -19,7 +21,8 @@ export class AuthService  implements IAuthService {
     constructor(
         @inject("IAuthRepository") private readonly authRepo: IAuthRepository,
         @inject("IEmailProvider") private readonly email: IEmailProvider,
-        @inject("ITokenProvider") private readonly tokens: ITokenProvider
+        @inject("ITokenProvider") private readonly tokens: ITokenProvider,
+        @inject("IOAuthService")private readonly auth: IOAuthService
     ) {
     }
     private validatePassword(password: string): void {
@@ -68,7 +71,7 @@ export class AuthService  implements IAuthService {
             throw new ValidationError("Invalid email");
         }
         const passwordHash = await bcrypt.hash(password, 10);
-        const newUser = await this.authRepo.createUser(username,email, passwordHash);
+        const newUser = await this.authRepo.createUser(username,email, passwordHash, "");
 
         const token = generateToken(newUser.id,  newUser.username  );
 
@@ -129,5 +132,47 @@ export class AuthService  implements IAuthService {
         };
         await this.authRepo.updateUser(user.id, updateData);
         await this.email.sendPasswordChangeConfirmation(user.email, user.username);
+    }
+    async googleAuth(googleToken:string):Promise<{
+        token: undefined | string;
+        user: { id: any; username: any; email: any }
+    }> {
+        const userInfo = await this.auth.verify("google",googleToken);
+        if (!userInfo || !userInfo.email) {
+            throw new ValidationError('Invalid Google token');
+        }
+        let user = await this.authRepo.getUserByEmail(userInfo.email);
+        const passwordHash = await bcrypt.hash(Math.random().toString(36).slice(-8), 10);
+        if (!user) {
+            user = await this.authRepo.createUser(
+                userInfo.name || userInfo.email.split('@')[0],
+                userInfo.email,
+                passwordHash,
+                userInfo.avatar
+            );
+        }
+        const token = generateToken(user.id,  user.username  );
+        return { token, user: { id: user.id, username: user.username, email: user.email } };
+    }
+    async githubAuth(githubToken:string):Promise<{
+        token: undefined | string;
+        user: { id: any; username: any; email: any }
+    }>{
+        const userInfo = await this.auth.verify("github",githubToken);
+        if (!userInfo || !userInfo.email) {
+            throw new ValidationError('Invalid GitHub token');
+        }
+        let user = await this.authRepo.getUserByEmail(userInfo.email);
+        const passwordHash = await bcrypt.hash(Math.random().toString(36).slice(-8), 10);
+        if (!user) {
+            user = await this.authRepo.createUser(
+                userInfo.name || userInfo.email.split('@')[0],
+                userInfo.email,
+                passwordHash,
+                userInfo.avatar
+            );
+        }
+        const token = generateToken(user.id,  user.username  );
+        return { token, user: { id: user.id, username: user.username, email: user.email } };
     }
 }

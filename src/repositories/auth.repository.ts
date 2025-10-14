@@ -3,7 +3,7 @@ import {Prisma, User} from "@prisma/client";
 import {injectable} from "tsyringe";
 import {UserProfile} from "../types/user/UserProfile";
 export interface IAuthRepository {
-    createUser(username:string,email: string, passwordHash: string): Promise<User>;
+    createUser(username:string,email: string, passwordHash: string, avatarurl:string|undefined): Promise<User>;
     getUserByEmail(email:string): Promise<User | null>;
     getUserById(id:string): Promise<User | null>;
     updateUser(id: string, data: Prisma.UserUpdateInput): Promise<UserProfile>;
