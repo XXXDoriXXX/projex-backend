@@ -1,57 +1,84 @@
-import { CreateProjectData } from '../types/Project';
-import { ProjectVisible } from '../types/ProjectVisible';
+import 'reflect-metadata';
+import { CreateProjectData } from '../types/project/Project';
+import { ProjectVisible } from '../types/project/ProjectVisible';
 import { projectFieldValid } from '../utils/projectFieldValid';
 import crypto from 'crypto';
 import { ValidationError, NotFoundError, ForbiddenError, DatabaseError } from '../errors/CustomErrors';
 import { ensureAccess } from '../utils/encruceAcces';
 import { requireUserIdProjectId } from '../utils/requireUserIdProjectId';
-import { ProjectRepository } from '../repositories/project.repository';
-import { Service } from 'typedi';
-@Service()
-export class ProjectService {
-    constructor(public repo: ProjectRepository) {}
-    async getProjectById(id: string, token?: string, userId?: string): Promise<ProjectDto> {
-        if (!id) {
-            throw new ValidationError('Project ID is required', 'id');
-        }
+import { type IProjectRepository, ProjectRepository } from '../repositories/project.repository';
+import { inject, injectable } from 'tsyringe';
+import { Project, ProjectMedia, Technology, User } from '@prisma/client';
+
+export interface IProjectService {
+    getProjectById(
+        id: string,
+        token?: string,
+        userId?: string,
+    ): Promise<{
+        media: ProjectMedia[];
+        technologies: Technology[];
+        user?: User;
+        likesCount: number;
+        viewsCount: number;
+    }>;
+    getUserProjects(userId: string): Promise<Project[]>;
+    deleteProject(id: string, userId: string): Promise<Project>;
+    updateProject(id: string, data: CreateProjectData): Promise<Project>;
+    createProject(data: CreateProjectData): Promise<Project>;
+    setVisibility(id: string, token: string | null): Promise<Project>;
+    changeProjectVisibility(id: string, userId: string, visible: ProjectVisible): Promise<Project>;
+}
+
+@injectable()
+export class ProjectService implements IProjectService {
+    constructor(@inject('IProjectRepository') private repo: IProjectRepository) {}
+
+    async getProjectById(
+        id: string,
+        token?: string,
+        userId?: string,
+    ): Promise<{
+        media: ProjectMedia[];
+        technologies: Technology[];
+        user?: User;
+        likesCount: number;
+        viewsCount: number;
+    }> {
         try {
             const project = await this.repo.findById(id);
-            if (!project) {
-                throw new NotFoundError(`Project`, id);
-            }
-            ensureAccess(project, token, userId);
-            const viewsAgg = await this.repo.getViewsCount(id);
-            const viewsTotal = viewsAgg?._sum?.count ?? 0;
 
-            const { _count: internalCount, ...rest } = project as any;
+            if (!project) {
+                throw new NotFoundError('Project', id);
+            }
+
+            await ensureAccess(project, token, userId);
+
+            const { _count: internalCount, ...rest } = project;
+            const viewsCount = await this.repo.getViewsCount(id);
 
             return {
                 ...rest,
-                metrics: {
-                    likes: internalCount.likes,
-                    views: {
-                        rows: internalCount.views,
-                        total: viewsTotal,
-                    },
-                },
+                likesCount: internalCount.likes,
+                viewsCount: viewsCount._sum.count || 0,
             };
-        } catch (err: any) {
-            throw new DatabaseError(`Failed to fetch project. ${err.message}`, {
-                projectId: id,
-            });
+        } catch (error) {
+            if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+                throw error;
+            }
+            throw new DatabaseError('Failed to get project', { id });
         }
     }
 
-    async getUserProjects(userId: string) {
-        if (!userId) {
-            throw new ValidationError(`User ID is required`, `${userId}`);
-        }
+    async getUserProjects(userId: string, currentUserId?: string | undefined): Promise<Project[]> {
         try {
             const projects = await this.repo.getUserProjects(userId);
-            console.log(projects);
-            if (projects.length === 0) {
-                throw new NotFoundError(`User dont have a projects`, `user id:${userId}`);
+            const isOwner = currentUserId === userId;
+
+            if (!isOwner) {
+                return projects.filter((project) => project.privateLinkToken === null);
             }
+
             return projects;
         } catch (err: any) {
             throw new DatabaseError(`Failed to fetch user's projects. ${err.message}`, {
@@ -76,13 +103,14 @@ export class ProjectService {
         }
     }
 
-    async updateProject(id: string, data: CreateProjectData) {
+    async updateProject(id: string, data: CreateProjectData): Promise<Project> {
         requireUserIdProjectId(id, data?.userId);
 
         const project = await this.repo.isProjectExists(id);
         if (!project) {
             throw new NotFoundError(`Project`, id);
         }
+
         if (project.userId !== data.userId) {
             throw new ForbiddenError(`You do not have permission to update this project`);
         }
@@ -104,7 +132,7 @@ export class ProjectService {
         }
     }
 
-    async createProject(data: CreateProjectData) {
+    async createProject(data: CreateProjectData): Promise<Project> {
         if (!data?.userId) {
             throw new ValidationError(`User ID is required`, `userId`);
         }
@@ -121,7 +149,7 @@ export class ProjectService {
         }
     }
 
-    async setVisibility(id: string, token: string | null) {
+    async setVisibility(id: string, token: string | null): Promise<Project> {
         try {
             return await this.repo.updateVisibility(id, token);
         } catch (_err) {
@@ -129,8 +157,9 @@ export class ProjectService {
         }
     }
 
-    async changeProjectVisibility(id: string, userId: string, visible: ProjectVisible) {
+    async changeProjectVisibility(id: string, userId: string, visible: ProjectVisible): Promise<Project> {
         requireUserIdProjectId(id, userId);
+
         if (!visible) {
             throw new ValidationError(`Visibility option is required`, `visible`);
         }
@@ -139,6 +168,7 @@ export class ProjectService {
         if (!project) {
             throw new NotFoundError(`Project`, id);
         }
+
         if (project.userId !== userId) {
             throw new ForbiddenError(`You do not have permission to update this project`);
         }

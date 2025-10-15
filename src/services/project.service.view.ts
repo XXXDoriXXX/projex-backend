@@ -1,16 +1,21 @@
 import { DatabaseError, NotFoundError, ValidationError } from '../errors/CustomErrors';
 import { hashIp } from '../utils/hashIp';
-import { ProjectRepository } from '../repositories/project.repository';
-import { ProjectMetricsRepository } from '../repositories/project.metrics.repository';
-import { Service } from 'typedi';
+import { type IProjectRepository } from '../repositories/project.repository';
+import { inject, injectable } from 'tsyringe';
+import { type IProjectMetricsRepository } from '../repositories/project.metrics.repository';
+import { View } from '@prisma/client';
+export interface IProjectServiceView {
+    recordProjectView(projectId: string, opts?: { userId?: string; ip?: string; ipHash?: string }): Promise<View>;
+}
 
-@Service()
-export class ProjectServiceView {
+@injectable()
+export class ProjectServiceView implements IProjectServiceView {
     constructor(
-        public repoProject: ProjectRepository,
-        public repoView: ProjectMetricsRepository,
+        @inject('IProjectRepository') private projectRepository: IProjectRepository,
+        @inject('IProjectMetricsRepository') private projectMetricsRepository: IProjectMetricsRepository,
     ) {}
-    async recordProjectView(projectId: string, opts?: { userId?: string; ip?: string; ipHash?: string }) {
+
+    async recordProjectView(projectId: string, opts?: { userId?: string; ip?: string; ipHash?: string }): Promise<View> {
         console.log(opts);
         const userId = opts?.userId ?? null;
 
@@ -18,14 +23,14 @@ export class ProjectServiceView {
             throw new ValidationError('Project ID is required', 'projectId');
         }
 
-        const project = await this.repoProject.findById(projectId);
+        const project = await this.projectRepository.findById(projectId);
         if (!project) {
             throw new NotFoundError('Project', projectId);
         }
 
         try {
             if (userId) {
-                return await this.repoView.upsertView(projectId, userId);
+                return await this.projectMetricsRepository.upsertView(projectId, userId);
             }
             console.log(opts?.ip);
             const salt = process.env.IP_HASH_SALT;
@@ -38,7 +43,7 @@ export class ProjectServiceView {
 
             const finalIpHash = opts?.ipHash ?? hashIp(opts!.ip as string, salt as string);
 
-            return await this.repoView.upsertAnonymousView(projectId, finalIpHash);
+            return await this.projectMetricsRepository.upsertAnonymousView(projectId, finalIpHash);
         } catch (err: any) {
             throw new DatabaseError('Failed to record project view', {
                 projectId,

@@ -1,25 +1,18 @@
 import { Router } from 'express';
-import {
-    confirmResetPassword,
-    getCurrentUser,
-    githubLogin,
-    googleLogin,
-    login,
-    sendResetPassword,
-    sendVerificationCode,
-    signUp,
-    verifyEmail,
-} from '../controllers/auth.controller';
+import { container } from 'tsyringe';
 import { authenticate } from '../middleware/auth';
-const router = Router();
+import { authController } from '../controllers/auth.controller';
 
-router.post('/google', googleLogin);
-router.post('/register', signUp);
-router.post('/login', login);
-router.post('/verify-email/:token', authenticate, verifyEmail);
-router.post('/send-verification-code', authenticate, sendVerificationCode);
-router.get('/me', authenticate, getCurrentUser);
-router.get('/github/callback', githubLogin);
-router.get('/password/resetcode', authenticate, sendResetPassword);
-router.post('/resetpassword', authenticate, confirmResetPassword);
+const authctrl = container.resolve(authController);
+
+const router = Router();
+router.get('/me', authenticate, authctrl.getUser);
+router.post('/login', authctrl.login);
+router.post('/register', authctrl.register);
+router.post('/send-verification-code', authenticate, authctrl.sendVerificationCode);
+router.post('/verify-email', authenticate, authctrl.verifyEmail);
+router.post('/send-reset-password', authenticate, authctrl.sendPasswordResetCode);
+router.post('/reset-password', authenticate, authctrl.resetPassword);
+router.post('/google', authctrl.googleAuth);
+router.get('/github', authctrl.githubAuth);
 export default router;

@@ -1,7 +1,16 @@
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
-import { getUserById } from '../services/auth.service';
+import { prisma } from '../prisma';
+import { asyncHandler } from '../utils/asyncHandler';
+import { ForbiddenError } from '../errors/CustomErrors';
+import { NotFoundError } from 'routing-controllers';
 
+export const getUserById = async (id: string) => {
+    return prisma.user.findUnique({
+        where: { id },
+        select: { id: true, username: true, email: true },
+    });
+};
 const JWT_SECRET = process.env.JWT_SECRET || 'MeowMeowMeow';
 
 export interface AuthenticatedRequest extends Request {
@@ -41,27 +50,27 @@ export const optionalAuthenticate = async (req: AuthenticatedRequest, _res: Resp
     }
 };
 
-export const authenticate = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const authenticate = asyncHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const token = extractBearerToken(req.headers.authorization);
     if (!token) {
-        return res.status(401).json({ message: 'Unauthorized' });
+        throw new ForbiddenError('Authentication required');
     }
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload;
 
         if (!decoded?.userId || !decoded?.username) {
-            return res.status(403).json({ message: 'Invalid token payload' });
+            throw new ForbiddenError('Invalid token payload');
         }
 
         const user = await getUserById(decoded.userId);
         if (!user) {
-            return res.status(403).json({ message: 'User does not exist' });
+            throw new NotFoundError('User does not exist');
         }
 
         req.user = { userId: decoded.userId, username: decoded.username };
         return next();
     } catch {
-        return res.status(403).json({ message: 'Forbidden' });
+        throw new ForbiddenError('Authentication failed');
     }
-};
+});

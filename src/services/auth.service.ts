@@ -1,247 +1,163 @@
-import prisma from '../prisma';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
-import { Resend } from 'resend';
-import { OAuth2Client } from 'google-auth-library';
-import axios from 'axios';
+import { inject, injectable } from 'tsyringe';
+import { z } from 'zod';
+import { type IAuthRepository } from '../repositories/auth.repository';
+import { type IEmailProvider } from '../modules/email.provider';
+import { type ITokenProvider } from '../modules/token.provider';
+import { User } from '@prisma/client';
+import { ForbiddenError, NotFoundError } from 'routing-controllers';
+import { generateToken } from '../utils/generateToken';
+import { ValidationError } from '../errors/CustomErrors';
+import { type IGoogleOAuthProvider } from '../modules/oauth.provider';
+import { type IOAuthService } from './oauth.service';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'MewMewMew';
-const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
-const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
-const resend = new Resend(process.env.RESEND_API_KEY || '');
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-export const getUserById = async (id: string) => {
-    return prisma.user.findUnique({
-        where: { id },
-        select: { id: true, username: true, email: true },
-    });
-};
-export const getUserAvatar = async (id: string) => {
-    return prisma.user.findUnique({
-        where: { id },
-        select: { avatarUrl: true },
-    });
-};
+const MINUTES = (m: number) => m * 60 * 1000;
+export interface IAuthService {
+    getUserById(id: string): Promise<User>;
+}
+@injectable()
+export class AuthService implements IAuthService {
+    constructor(
+        @inject('IAuthRepository') private readonly authRepo: IAuthRepository,
+        @inject('IEmailProvider') private readonly email: IEmailProvider,
+        @inject('ITokenProvider') private readonly tokens: ITokenProvider,
+        @inject('IOAuthService') private readonly auth: IOAuthService,
+    ) {}
+    private validatePassword(password: string): void {
+        const minLength = 8;
+        const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
 
-// export const getUserByUsername = async (username: string) => {
-//     return prisma.user.findUnique({
-//         where: { username },select:{id: true, username: true}
-//     })
-// }
-// export const getFullUserByUsername = async (username: string) => {
-//     return prisma.user.findUnique({ where: { username } });
-// };
-export const createUser = async (username: string, password: string, email: string) => {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    return prisma.user.create({
-        data: {
-            username,
-            email,
-            password: hashedPassword,
-        },
-    });
-};
-
-export const getUserByEmail = async (email: string) => {
-    return prisma.user.findUnique({
-        where: { email },
-        select: { id: true, username: true, email: true },
-    });
-};
-export const getFullUserByEmail = async (email: string) => {
-    return prisma.user.findUnique({
-        where: { email },
-    });
-};
-const generateCodce = async () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-};
-export const generatePasswordResetCode = async (email: string) => {
-    const user = await getUserByEmail(email);
-    if (!user) throw new Error('User not found');
-    try {
-        const code = await generateCodce();
-        console.log(`Generated password reset code for ${email}: ${code}`);
-        const updatedUser = await prisma.user.update({
-            where: { email },
-            data: {
-                passwordResetToken: code,
-                passwordResetExpires: new Date(Date.now() + 10 * 60 * 1000),
-            },
-        });
-
-        console.log('Updated user:', updatedUser);
-
-        return code;
-    } catch (error) {
-        console.log(error);
-        throw new Error('Error generating password reset code');
+        if (password.length < minLength) {
+            throw new ValidationError('Password must be at least 8 characters long');
+        }
+        if (!regex.test(password)) {
+            throw new ValidationError('Password must include uppercase, lowercase, number, and special character');
+        }
     }
-};
-export const generateVerificationCode = async (email: string) => {
-    const user = await getUserByEmail(email);
-    if (!user) throw new Error('User not found');
-    try {
-        const code = await generateCodce();
-        console.log(`Generated verification code for ${email}: ${code}`);
-        const updatedUser = await prisma.user.update({
-            where: { email },
-            data: {
-                emailVerificationToken: code,
-                emailVerificationExpires: new Date(Date.now() + 3600000),
-            },
-        });
 
-        console.log('Updated user:', updatedUser);
+    private generate6Code() {
+        return Math.floor(100000 + Math.random() * 900000).toString();
+    }
 
-        return code;
-    } catch (error) {
-        console.log(error);
-        throw new Error('Error generating verification code');
+    async getUserById(id: string): Promise<User> {
+        const user = await this.authRepo.getUserById(id);
+        if (!user) throw new Error('User not found');
+        return user;
     }
-};
-export const verifyVerificationCode = async (token: string) => {
-    const user = await prisma.user.findUnique({
-        where: { emailVerificationToken: token },
-    });
-    console.log(user);
-    console.log(token);
-    if (!user || !user.emailVerificationExpires || user.emailVerificationExpires < new Date()) {
-        console.log(user?.emailVerificationExpires, new Date());
-        throw new Error('Invalid or expired verification code');
+    async login(email: string, password: string) {
+        const user = await this.authRepo.getUserByEmail(email);
+        if (!user) throw new ForbiddenError('User not found');
+        if (!user.isActive) throw new ForbiddenError('User is deactivated');
+        if (!user.password) throw new ForbiddenError('Passwords do not match');
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) throw new ForbiddenError('Invalid email or password');
+
+        const token = generateToken(user.id, user.username);
+
+        return { token, user: { id: user.id, username: user.username, email: user.email } };
     }
-    return await prisma.user.update({
-        where: { id: user.id },
-        data: {
+    async register(username: string, email: string, password: string) {
+        const existingUser = await this.authRepo.getUserByEmail(email);
+        if (existingUser) {
+            throw new ForbiddenError('Email already in use');
+        }
+        const EmailZ = z.string().email();
+
+        if (!EmailZ.safeParse(email).success) {
+            throw new ValidationError('Invalid email');
+        }
+        const passwordHash = await bcrypt.hash(password, 10);
+        const newUser = await this.authRepo.createUser(username, email, passwordHash, '');
+
+        const token = generateToken(newUser.id, newUser.username);
+
+        return { token, user: { id: newUser.id, username: newUser.username, email: newUser.email } };
+    }
+    async verifyEmail(userId: string, code: string): Promise<boolean> {
+        const user = await this.authRepo.getUserById(userId);
+        if (!user) throw new NotFoundError('User not found');
+        if (user.isVerified) throw new ValidationError('User already verified');
+        if (user.emailVerificationToken !== code) throw new Error('Invalid verification code');
+        if (user.emailVerificationExpires && user.emailVerificationExpires < new Date()) {
+            throw new ValidationError('Verification code expired');
+        }
+        const updateData = {
             isVerified: true,
             emailVerificationToken: null,
             emailVerificationExpires: null,
-        },
-    });
-};
-
-export const sendEmail = async (email: string) => {
-    const user = await getUserByEmail(email);
-    if (!user) throw new Error('User not found');
-    const code = await generateVerificationCode(email);
-    await resend.emails.send({
-        from: 'no-reply@projex.foo',
-        to: email,
-        subject: 'Confirm your email for Projex',
-        html: `
-    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 20px; background: #f9f9f9; border-radius: 8px; border: 1px solid #e5e5e5;">
-      <h2 style="color: #333;">Hey there 👋</h2>
-      <p style="font-size: 16px; color: #555;">Thanks for signing up for <strong>Projex</strong>! To keep your account secure, we just need to confirm your email address.</p>
-      <p style="font-size: 16px; color: #555;">Here’s your 6-digit verification code:</p>
-      <p style="font-size: 24px; font-weight: bold; color: #111; text-align: center; letter-spacing: 4px; margin: 20px 0;">${code}</p>
-      <p style="font-size: 14px; color: #777;">This code will expire in 10 minutes. If you didn’t request this, you can ignore this email.</p>
-      <p style="font-size: 14px; color: #999;">– The Projex Team</p>
-    </div>
-  `,
-    });
-};
-export const getGithubAccessToken = async (code: string) => {
-    const tokenRes = await axios.post(
-        'https://github.com/login/oauth/access_token',
-        {
-            client_id: GITHUB_CLIENT_ID,
-            client_secret: GITHUB_CLIENT_SECRET,
-            code,
-        },
-        {
-            headers: { Accept: 'application/json' },
-        },
-    );
-
-    const access_token = tokenRes.data.access_token;
-    if (!access_token) throw new Error('Access token not received');
-    return access_token;
-};
-export const getGithubUserInfo = async (token: string) => {
-    const userRes = await axios.get('https://api.github.com/user', {
-        headers: { Authorization: `token ${token}` },
-    });
-    return userRes.data;
-};
-export const getGithubEmail = async (token: string) => {
-    const emailRes = await axios.get('https://api.github.com/user/emails', {
-        headers: { Authorization: `token ${token}` },
-    });
-    const emails = emailRes.data;
-    const primaryEmail = emails.find((email: any) => email.primary && email.verified);
-    if (!primaryEmail) throw new Error('Primary email not found');
-    return primaryEmail.email;
-};
-export const verifyGoogleToken = async (token: string) => {
-    const ticket = await client.verifyIdToken({
-        idToken: token,
-        audience: process.env.GOOGLE_CLIENT_ID,
-    });
-
-    const payload = ticket.getPayload();
-    if (!payload || !payload.email) throw new Error('Invalid Google token');
-
-    return {
-        email: payload.email,
-        name: payload.name,
-        avatar: payload.picture,
-    };
-};
-export const generateToken = (user: { id: string; username: string }) => {
-    return jwt.sign(
-        {
-            userId: user.id,
-            username: user.username,
-        },
-        JWT_SECRET,
-        { expiresIn: '1h' },
-    );
-};
-export async function sendResetPasswordEmail(email: string) {
-    const user = await getUserByEmail(email);
-    if (!user) throw new Error('User not found');
-
-    const code = await generatePasswordResetCode(email);
-
-    await resend.emails.send({
-        from: 'no-reply@projex.foo',
-        to: email,
-        subject: 'Reset your password – Projex',
-        html: `
-        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; background: #ffffff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #eaeaea;">
-            <h2 style="color: #2d2d2d;">🔐 Reset your password</h2>
-            <p style="font-size: 16px; color: #4a4a4a;">Hi <strong>${user.username}</strong>,</p>
-            <p style="font-size: 16px; color: #4a4a4a;">We received a request to reset the password for your Projex account.</p>
-            <p style="margin: 24px 0; text-align: center;">
-                <span style="display: inline-block; font-size: 28px; letter-spacing: 8px; font-weight: bold; color: #111;">${code}</span>
-            </p>
-            <p style="font-size: 14px; color: #666;">This code will expire in <strong>10 minutes</strong>. If you didn’t request a password reset, you can safely ignore this email.</p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
-            <p style="font-size: 14px; color: #999;">– The Projex Team</p>
-        </div>
-        `,
-    });
-}
-export const verifyResetPasswordToken = async (token: string) => {
-    const user = await prisma.user.findUnique({
-        where: { passwordResetToken: token },
-    });
-
-    if (!user || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
-        throw new Error('Invalid or expired reset password token');
+        };
+        await this.authRepo.updateUser(user.id, updateData);
+        await this.email.sendVerificationConfirmation(user.email, user.username);
+        return true;
     }
+    async sendVerificationEmail(userId: string): Promise<void> {
+        const user = await this.authRepo.getUserById(userId);
 
-    return user;
-};
-export const updateUserPassword = async (userId: string, newPassword: string) => {
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    return prisma.user.update({
-        where: { id: userId },
-        data: {
-            password: hashedPassword,
+        if (!user) throw new NotFoundError('User not found');
+        if (user.isVerified) throw new ValidationError('User already verified');
+        const code = this.generate6Code();
+        await this.authRepo.addVerificationCode(user.email, code);
+        await this.email.sendVerification(user.email, code, user.username);
+    }
+    async sendResetPasswordEmail(userId: string, password: string): Promise<void> {
+        const user = await this.authRepo.getUserById(userId);
+        if (!user) throw new NotFoundError('User not found');
+        if (!user.isActive) throw new ForbiddenError('User is deactivated');
+        if (!user.password) throw new ForbiddenError('Passwords do not match');
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) throw new ForbiddenError('Passwords do not match');
+        const code = this.generate6Code();
+        await this.authRepo.addResetCode(user.email, code);
+        await this.email.sendPasswordReset(user.email, code, user.username);
+    }
+    async resetPassword(userId: string, code: string, newPassword: string): Promise<void> {
+        const user = await this.authRepo.getUserById(userId);
+        if (!user) throw new NotFoundError('User not found');
+        if (!user.isActive) throw new ForbiddenError('User is deactivated');
+        if (user.passwordResetToken !== code) throw new ValidationError('Invalid reset code');
+        if (user.passwordResetExpires && user.passwordResetExpires < new Date()) {
+            throw new ValidationError('Reset code expired');
+        }
+        this.validatePassword(newPassword);
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+        const updateData = {
+            password: passwordHash,
             passwordResetToken: null,
             passwordResetExpires: null,
-        },
-    });
-};
+        };
+        await this.authRepo.updateUser(user.id, updateData);
+        await this.email.sendPasswordChangeConfirmation(user.email, user.username);
+    }
+    async googleAuth(googleToken: string): Promise<{
+        token: undefined | string;
+        user: { id: any; username: any; email: any };
+    }> {
+        const userInfo = await this.auth.verify('google', googleToken);
+        if (!userInfo || !userInfo.email) {
+            throw new ValidationError('Invalid Google token');
+        }
+        let user = await this.authRepo.getUserByEmail(userInfo.email);
+        const passwordHash = await bcrypt.hash(Math.random().toString(36).slice(-8), 10);
+        if (!user) {
+            user = await this.authRepo.createUser(userInfo.name || userInfo.email.split('@')[0], userInfo.email, passwordHash, userInfo.avatar);
+        }
+        const token = generateToken(user.id, user.username);
+        return { token, user: { id: user.id, username: user.username, email: user.email } };
+    }
+    async githubAuth(githubToken: string): Promise<{
+        token: undefined | string;
+        user: { id: any; username: any; email: any };
+    }> {
+        const userInfo = await this.auth.verify('github', githubToken);
+        if (!userInfo || !userInfo.email) {
+            throw new ValidationError('Invalid GitHub token');
+        }
+        let user = await this.authRepo.getUserByEmail(userInfo.email);
+        const passwordHash = await bcrypt.hash(Math.random().toString(36).slice(-8), 10);
+        if (!user) {
+            user = await this.authRepo.createUser(userInfo.name || userInfo.email.split('@')[0], userInfo.email, passwordHash, userInfo.avatar);
+        }
+        const token = generateToken(user.id, user.username);
+        return { token, user: { id: user.id, username: user.username, email: user.email } };
+    }
+}
