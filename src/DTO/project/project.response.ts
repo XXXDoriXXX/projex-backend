@@ -1,6 +1,6 @@
 // src/dto/project/project.response.ts
-import { z } from "zod";
-import { VisibilitySchema } from "./project.dto";
+import { z } from 'zod';
+import { VisibilitySchema } from './project.dto';
 
 export const ProjectMediaResp = z.object({
     id: z.string(),

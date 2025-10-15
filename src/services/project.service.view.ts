@@ -1,22 +1,21 @@
 import { DatabaseError, NotFoundError, ValidationError } from '../errors/CustomErrors';
 import { hashIp } from '../utils/hashIp';
-import {type IProjectRepository} from '../repositories/project.repository';
-import {inject, injectable} from "tsyringe";
-import {type IProjectMetricsRepository} from "../repositories/project.metrics.repository";
-import {View} from "@prisma/client";
+import { type IProjectRepository } from '../repositories/project.repository';
+import { inject, injectable } from 'tsyringe';
+import { type IProjectMetricsRepository } from '../repositories/project.metrics.repository';
+import { View } from '@prisma/client';
 export interface IProjectServiceView {
-    recordProjectView(projectId: string, opts?: { userId?: string; ip?:string, ipHash?: string }): Promise<View>;
+    recordProjectView(projectId: string, opts?: { userId?: string; ip?: string; ipHash?: string }): Promise<View>;
 }
 
 @injectable()
 export class ProjectServiceView implements IProjectServiceView {
     constructor(
-        @inject("IProjectRepository") private projectRepository: IProjectRepository,
-        @inject("IProjectMetricsRepository") private projectMetricsRepository: IProjectMetricsRepository,
-
+        @inject('IProjectRepository') private projectRepository: IProjectRepository,
+        @inject('IProjectMetricsRepository') private projectMetricsRepository: IProjectMetricsRepository,
     ) {}
 
-    async recordProjectView(projectId: string, opts?: { userId?: string; ip?: string; ipHash?: string }):Promise<View> {
+    async recordProjectView(projectId: string, opts?: { userId?: string; ip?: string; ipHash?: string }): Promise<View> {
         console.log(opts);
         const userId = opts?.userId ?? null;
 

@@ -1,5 +1,5 @@
-import { injectable } from "tsyringe";
-import { Resend } from "resend";
+import { injectable } from 'tsyringe';
+import { Resend } from 'resend';
 export interface IEmailProvider {
     sendVerification(email: string, code: string, username?: string): Promise<void>;
     sendPasswordReset(email: string, code: string, username?: string): Promise<void>;
@@ -9,16 +9,16 @@ export interface IEmailProvider {
 
 @injectable()
 export class ResendEmailProvider implements IEmailProvider {
-    private resend = new Resend(process.env.RESEND_API_KEY || "");
+    private resend = new Resend(process.env.RESEND_API_KEY || '');
 
     async sendVerification(email: string, code: string, username?: string) {
         await this.resend.emails.send({
-            from: "no-reply@projex.foo",
+            from: 'no-reply@projex.foo',
             to: email,
-            subject: "Verify your email for Projex",
+            subject: 'Verify your email for Projex',
             html: `
       <div style="font-family: Inter, Roboto, sans-serif; color:#111; line-height:1.6; padding:24px;">
-        <h2 style="margin-bottom:12px;">Welcome to <span style="color:#3b82f6;">Projex</span>${username ? `, ${username}` : ""} 👋</h2>
+        <h2 style="margin-bottom:12px;">Welcome to <span style="color:#3b82f6;">Projex</span>${username ? `, ${username}` : ''} 👋</h2>
         <p>Thanks for joining our platform! Please use the code below to verify your email address.</p>
 
         <div style="margin:24px 0; text-align:center;">
@@ -37,12 +37,12 @@ export class ResendEmailProvider implements IEmailProvider {
     }
     async sendVerificationConfirmation(email: string, username?: string) {
         await this.resend.emails.send({
-            from: "no-reply@projex.foo",
+            from: 'no-reply@projex.foo',
             to: email,
-            subject: "Your email has been verified ✅",
+            subject: 'Your email has been verified ✅',
             html: `
       <div style="font-family: Inter, Roboto, sans-serif; color:#111; line-height:1.6; padding:24px;">
-        <h2 style="margin-bottom:12px;">Email verified successfully${username ? `, ${username}` : ""} 🎉</h2>
+        <h2 style="margin-bottom:12px;">Email verified successfully${username ? `, ${username}` : ''} 🎉</h2>
         <p>Your email address has been confirmed and your <b>Projex</b> account is now fully activated.</p>
         
         <div style="margin:24px 0; text-align:center;">
@@ -120,6 +120,4 @@ export class ResendEmailProvider implements IEmailProvider {
     `,
         });
     }
-
-
 }

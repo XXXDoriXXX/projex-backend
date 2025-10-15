@@ -1,9 +1,9 @@
-import jwt from "jsonwebtoken";
+import jwt from 'jsonwebtoken';
 
-export const generateToken = (  id: string, username: string) => {
+export const generateToken = (id: string, username: string) => {
     let JWT_SECRET = process.env.JWT_SECRET;
     if (!JWT_SECRET) {
-        return
+        return;
     }
     return jwt.sign(
         {

@@ -9,7 +9,7 @@ const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 const resend = new Resend(process.env.RESEND_API_KEY || '');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const prisma = new PrismaService;
+const prisma = new PrismaService();
 export const getUserById = async (id) => {
     return prisma.user.findUnique({
         where: { id },
@@ -56,8 +56,7 @@ const generateCodce = async () => {
 };
 export const generatePasswordResetCode = async (email) => {
     const user = await getUserByEmail(email);
-    if (!user)
-        throw new Error('User not found');
+    if (!user) throw new Error('User not found');
     try {
         const code = await generateCodce();
         console.log(`Generated password reset code for ${email}: ${code}`);
@@ -70,16 +69,14 @@ export const generatePasswordResetCode = async (email) => {
         });
         console.log('Updated user:', updatedUser);
         return code;
-    }
-    catch (error) {
+    } catch (error) {
         console.log(error);
         throw new Error('Error generating password reset code');
     }
 };
 export const generateVerificationCode = async (email) => {
     const user = await getUserByEmail(email);
-    if (!user)
-        throw new Error('User not found');
+    if (!user) throw new Error('User not found');
     try {
         const code = await generateCodce();
         console.log(`Generated verification code for ${email}: ${code}`);
@@ -92,8 +89,7 @@ export const generateVerificationCode = async (email) => {
         });
         console.log('Updated user:', updatedUser);
         return code;
-    }
-    catch (error) {
+    } catch (error) {
         console.log(error);
         throw new Error('Error generating verification code');
     }
@@ -119,8 +115,7 @@ export const verifyVerificationCode = async (token) => {
 };
 export const sendEmail = async (email) => {
     const user = await getUserByEmail(email);
-    if (!user)
-        throw new Error('User not found');
+    if (!user) throw new Error('User not found');
     const code = await generateVerificationCode(email);
     await resend.emails.send({
         from: 'no-reply@projex.foo',
@@ -139,16 +134,19 @@ export const sendEmail = async (email) => {
     });
 };
 export const getGithubAccessToken = async (code) => {
-    const tokenRes = await axios.post('https://github.com/login/oauth/access_token', {
-        client_id: GITHUB_CLIENT_ID,
-        client_secret: GITHUB_CLIENT_SECRET,
-        code,
-    }, {
-        headers: { Accept: 'application/json' },
-    });
+    const tokenRes = await axios.post(
+        'https://github.com/login/oauth/access_token',
+        {
+            client_id: GITHUB_CLIENT_ID,
+            client_secret: GITHUB_CLIENT_SECRET,
+            code,
+        },
+        {
+            headers: { Accept: 'application/json' },
+        },
+    );
     const access_token = tokenRes.data.access_token;
-    if (!access_token)
-        throw new Error('Access token not received');
+    if (!access_token) throw new Error('Access token not received');
     return access_token;
 };
 export const getGithubUserInfo = async (token) => {
@@ -163,8 +161,7 @@ export const getGithubEmail = async (token) => {
     });
     const emails = emailRes.data;
     const primaryEmail = emails.find((email) => email.primary && email.verified);
-    if (!primaryEmail)
-        throw new Error('Primary email not found');
+    if (!primaryEmail) throw new Error('Primary email not found');
     return primaryEmail.email;
 };
 export const verifyGoogleToken = async (token) => {
@@ -173,8 +170,7 @@ export const verifyGoogleToken = async (token) => {
         audience: process.env.GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
-    if (!payload || !payload.email)
-        throw new Error('Invalid Google token');
+    if (!payload || !payload.email) throw new Error('Invalid Google token');
     return {
         email: payload.email,
         name: payload.name,
@@ -182,15 +178,18 @@ export const verifyGoogleToken = async (token) => {
     };
 };
 export const generateToken = (user) => {
-    return jwt.sign({
-        userId: user.id,
-        username: user.username,
-    }, JWT_SECRET, { expiresIn: '1h' });
+    return jwt.sign(
+        {
+            userId: user.id,
+            username: user.username,
+        },
+        JWT_SECRET,
+        { expiresIn: '1h' },
+    );
 };
 export async function sendResetPasswordEmail(email) {
     const user = await getUserByEmail(email);
-    if (!user)
-        throw new Error('User not found');
+    if (!user) throw new Error('User not found');
     const code = await generatePasswordResetCode(email);
     await resend.emails.send({
         from: 'no-reply@projex.foo',

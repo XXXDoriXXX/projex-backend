@@ -4,8 +4,8 @@ import { Router } from 'express';
 
 import { validateProject } from '../middleware/project/validateProject';
 import { authenticate, optionalAuthenticate } from '../middleware/auth';
-import {ProjectController} from '../controllers/project.controller';
-import {container} from "tsyringe";
+import { ProjectController } from '../controllers/project.controller';
+import { container } from 'tsyringe';
 const projectController = container.resolve(ProjectController);
 const router = Router();
 router.post('/create', validateProject, authenticate, projectController.createProject);

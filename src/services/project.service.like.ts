@@ -1,8 +1,8 @@
 import { requireUserIdProjectId } from '../utils/requireUserIdProjectId';
 import { DatabaseError, NotFoundError } from '../errors/CustomErrors';
-import {type IProjectMetricsRepository} from '../repositories/project.metrics.repository';
-import {inject, injectable} from "tsyringe";
-import {Like} from "@prisma/client";
+import { type IProjectMetricsRepository } from '../repositories/project.metrics.repository';
+import { inject, injectable } from 'tsyringe';
+import { Like } from '@prisma/client';
 export interface IProjectServiceLike {
     isLikeExist(userId: string, projectId: string): Promise<Like>;
     likeProject(projectId: string, userId: string): Promise<number>;
@@ -10,9 +10,7 @@ export interface IProjectServiceLike {
 }
 @injectable()
 export class ProjectServiceLike implements IProjectServiceLike {
-    constructor(
-        @inject("IProjectMetricsRepository") private repo: IProjectMetricsRepository,
-    ) {}
+    constructor(@inject('IProjectMetricsRepository') private repo: IProjectMetricsRepository) {}
     async isLikeExist(userId: string, projectId: string): Promise<Like> {
         const existing = await this.repo.getLikeById(userId, projectId);
         if (!existing) {
@@ -22,7 +20,7 @@ export class ProjectServiceLike implements IProjectServiceLike {
     }
     async likeProject(projectId: string, userId: string): Promise<number> {
         requireUserIdProjectId(projectId, userId);
-        if(await this.isLikeExist(userId, projectId)){
+        if (await this.isLikeExist(userId, projectId)) {
             throw new DatabaseError(`You have already liked this project.`, { projectId, userId });
         }
         try {

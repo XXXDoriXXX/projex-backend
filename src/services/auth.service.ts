@@ -1,30 +1,28 @@
-import bcrypt from "bcryptjs";
-import {inject, injectable} from "tsyringe";
-import { z } from "zod";
-import {type IAuthRepository} from "../repositories/auth.repository";
-import {type IEmailProvider} from "../modules/email.provider";
-import {type ITokenProvider} from "../modules/token.provider";
-import {User} from "@prisma/client";
-import {ForbiddenError, NotFoundError} from "routing-controllers";
-import {generateToken} from "../utils/generateToken";
-import {ValidationError} from "../errors/CustomErrors";
-import {type IGoogleOAuthProvider} from "../modules/oauth.provider";
-import {type IOAuthService} from "./oauth.service";
-
+import bcrypt from 'bcryptjs';
+import { inject, injectable } from 'tsyringe';
+import { z } from 'zod';
+import { type IAuthRepository } from '../repositories/auth.repository';
+import { type IEmailProvider } from '../modules/email.provider';
+import { type ITokenProvider } from '../modules/token.provider';
+import { User } from '@prisma/client';
+import { ForbiddenError, NotFoundError } from 'routing-controllers';
+import { generateToken } from '../utils/generateToken';
+import { ValidationError } from '../errors/CustomErrors';
+import { type IGoogleOAuthProvider } from '../modules/oauth.provider';
+import { type IOAuthService } from './oauth.service';
 
 const MINUTES = (m: number) => m * 60 * 1000;
 export interface IAuthService {
-  getUserById(id: string): Promise<User>;
+    getUserById(id: string): Promise<User>;
 }
 @injectable()
-export class AuthService  implements IAuthService {
+export class AuthService implements IAuthService {
     constructor(
-        @inject("IAuthRepository") private readonly authRepo: IAuthRepository,
-        @inject("IEmailProvider") private readonly email: IEmailProvider,
-        @inject("ITokenProvider") private readonly tokens: ITokenProvider,
-        @inject("IOAuthService")private readonly auth: IOAuthService
-    ) {
-    }
+        @inject('IAuthRepository') private readonly authRepo: IAuthRepository,
+        @inject('IEmailProvider') private readonly email: IEmailProvider,
+        @inject('ITokenProvider') private readonly tokens: ITokenProvider,
+        @inject('IOAuthService') private readonly auth: IOAuthService,
+    ) {}
     private validatePassword(password: string): void {
         const minLength = 8;
         const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
@@ -33,9 +31,7 @@ export class AuthService  implements IAuthService {
             throw new ValidationError('Password must be at least 8 characters long');
         }
         if (!regex.test(password)) {
-            throw new ValidationError(
-                'Password must include uppercase, lowercase, number, and special character'
-            );
+            throw new ValidationError('Password must include uppercase, lowercase, number, and special character');
         }
     }
 
@@ -45,22 +41,22 @@ export class AuthService  implements IAuthService {
 
     async getUserById(id: string): Promise<User> {
         const user = await this.authRepo.getUserById(id);
-        if (!user) throw new Error("User not found");
+        if (!user) throw new Error('User not found');
         return user;
     }
     async login(email: string, password: string) {
         const user = await this.authRepo.getUserByEmail(email);
         if (!user) throw new ForbiddenError('User not found');
-        if(!user.isActive) throw new ForbiddenError('User is deactivated');
-        if(!user.password) throw new ForbiddenError('Passwords do not match');
+        if (!user.isActive) throw new ForbiddenError('User is deactivated');
+        if (!user.password) throw new ForbiddenError('Passwords do not match');
         const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) throw new ForbiddenError("Invalid email or password");
+        if (!isPasswordValid) throw new ForbiddenError('Invalid email or password');
 
-        const token = generateToken(user.id,  user.username  );
+        const token = generateToken(user.id, user.username);
 
         return { token, user: { id: user.id, username: user.username, email: user.email } };
     }
-    async register(username:string, email: string, password: string) {
+    async register(username: string, email: string, password: string) {
         const existingUser = await this.authRepo.getUserByEmail(email);
         if (existingUser) {
             throw new ForbiddenError('Email already in use');
@@ -68,22 +64,22 @@ export class AuthService  implements IAuthService {
         const EmailZ = z.string().email();
 
         if (!EmailZ.safeParse(email).success) {
-            throw new ValidationError("Invalid email");
+            throw new ValidationError('Invalid email');
         }
         const passwordHash = await bcrypt.hash(password, 10);
-        const newUser = await this.authRepo.createUser(username,email, passwordHash, "");
+        const newUser = await this.authRepo.createUser(username, email, passwordHash, '');
 
-        const token = generateToken(newUser.id,  newUser.username  );
+        const token = generateToken(newUser.id, newUser.username);
 
         return { token, user: { id: newUser.id, username: newUser.username, email: newUser.email } };
     }
     async verifyEmail(userId: string, code: string): Promise<boolean> {
         const user = await this.authRepo.getUserById(userId);
-        if (!user) throw new NotFoundError("User not found");
-        if (user.isVerified) throw new ValidationError("User already verified");
-        if (user.emailVerificationToken !== code) throw new Error("Invalid verification code");
+        if (!user) throw new NotFoundError('User not found');
+        if (user.isVerified) throw new ValidationError('User already verified');
+        if (user.emailVerificationToken !== code) throw new Error('Invalid verification code');
         if (user.emailVerificationExpires && user.emailVerificationExpires < new Date()) {
-            throw new ValidationError("Verification code expired");
+            throw new ValidationError('Verification code expired');
         }
         const updateData = {
             isVerified: true,
@@ -95,20 +91,19 @@ export class AuthService  implements IAuthService {
         return true;
     }
     async sendVerificationEmail(userId: string): Promise<void> {
-
         const user = await this.authRepo.getUserById(userId);
 
-        if (!user) throw new NotFoundError("User not found");
-        if (user.isVerified) throw new ValidationError("User already verified");
+        if (!user) throw new NotFoundError('User not found');
+        if (user.isVerified) throw new ValidationError('User already verified');
         const code = this.generate6Code();
         await this.authRepo.addVerificationCode(user.email, code);
         await this.email.sendVerification(user.email, code, user.username);
     }
-    async sendResetPasswordEmail(userId: string,password:string): Promise<void> {
+    async sendResetPasswordEmail(userId: string, password: string): Promise<void> {
         const user = await this.authRepo.getUserById(userId);
-        if (!user) throw new NotFoundError("User not found");
-        if(!user.isActive) throw new ForbiddenError('User is deactivated');
-        if(!user.password) throw new ForbiddenError('Passwords do not match');
+        if (!user) throw new NotFoundError('User not found');
+        if (!user.isActive) throw new ForbiddenError('User is deactivated');
+        if (!user.password) throw new ForbiddenError('Passwords do not match');
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) throw new ForbiddenError('Passwords do not match');
         const code = this.generate6Code();
@@ -117,11 +112,11 @@ export class AuthService  implements IAuthService {
     }
     async resetPassword(userId: string, code: string, newPassword: string): Promise<void> {
         const user = await this.authRepo.getUserById(userId);
-        if (!user) throw new NotFoundError("User not found");
-        if(!user.isActive) throw new ForbiddenError('User is deactivated');
-        if (user.passwordResetToken !== code) throw new ValidationError("Invalid reset code");
+        if (!user) throw new NotFoundError('User not found');
+        if (!user.isActive) throw new ForbiddenError('User is deactivated');
+        if (user.passwordResetToken !== code) throw new ValidationError('Invalid reset code');
         if (user.passwordResetExpires && user.passwordResetExpires < new Date()) {
-            throw new ValidationError("Reset code expired");
+            throw new ValidationError('Reset code expired');
         }
         this.validatePassword(newPassword);
         const passwordHash = await bcrypt.hash(newPassword, 10);
@@ -133,46 +128,36 @@ export class AuthService  implements IAuthService {
         await this.authRepo.updateUser(user.id, updateData);
         await this.email.sendPasswordChangeConfirmation(user.email, user.username);
     }
-    async googleAuth(googleToken:string):Promise<{
+    async googleAuth(googleToken: string): Promise<{
         token: undefined | string;
-        user: { id: any; username: any; email: any }
+        user: { id: any; username: any; email: any };
     }> {
-        const userInfo = await this.auth.verify("google",googleToken);
+        const userInfo = await this.auth.verify('google', googleToken);
         if (!userInfo || !userInfo.email) {
             throw new ValidationError('Invalid Google token');
         }
         let user = await this.authRepo.getUserByEmail(userInfo.email);
         const passwordHash = await bcrypt.hash(Math.random().toString(36).slice(-8), 10);
         if (!user) {
-            user = await this.authRepo.createUser(
-                userInfo.name || userInfo.email.split('@')[0],
-                userInfo.email,
-                passwordHash,
-                userInfo.avatar
-            );
+            user = await this.authRepo.createUser(userInfo.name || userInfo.email.split('@')[0], userInfo.email, passwordHash, userInfo.avatar);
         }
-        const token = generateToken(user.id,  user.username  );
+        const token = generateToken(user.id, user.username);
         return { token, user: { id: user.id, username: user.username, email: user.email } };
     }
-    async githubAuth(githubToken:string):Promise<{
+    async githubAuth(githubToken: string): Promise<{
         token: undefined | string;
-        user: { id: any; username: any; email: any }
-    }>{
-        const userInfo = await this.auth.verify("github",githubToken);
+        user: { id: any; username: any; email: any };
+    }> {
+        const userInfo = await this.auth.verify('github', githubToken);
         if (!userInfo || !userInfo.email) {
             throw new ValidationError('Invalid GitHub token');
         }
         let user = await this.authRepo.getUserByEmail(userInfo.email);
         const passwordHash = await bcrypt.hash(Math.random().toString(36).slice(-8), 10);
         if (!user) {
-            user = await this.authRepo.createUser(
-                userInfo.name || userInfo.email.split('@')[0],
-                userInfo.email,
-                passwordHash,
-                userInfo.avatar
-            );
+            user = await this.authRepo.createUser(userInfo.name || userInfo.email.split('@')[0], userInfo.email, passwordHash, userInfo.avatar);
         }
-        const token = generateToken(user.id,  user.username  );
+        const token = generateToken(user.id, user.username);
         return { token, user: { id: user.id, username: user.username, email: user.email } };
     }
 }

@@ -1,9 +1,9 @@
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
-import {prisma} from "../prisma";
-import {asyncHandler} from "../utils/asyncHandler";
-import {ForbiddenError} from "../errors/CustomErrors";
-import {NotFoundError} from "routing-controllers";
+import { prisma } from '../prisma';
+import { asyncHandler } from '../utils/asyncHandler';
+import { ForbiddenError } from '../errors/CustomErrors';
+import { NotFoundError } from 'routing-controllers';
 
 export const getUserById = async (id: string) => {
     return prisma.user.findUnique({

@@ -5,23 +5,21 @@ import { CreateProjectData } from '../types/project/Project';
 import { ProjectVisible } from '../types/project/ProjectVisible';
 import { asyncHandler } from '../utils/asyncHandler';
 import { ValidationError, NotFoundError, ForbiddenError } from '../errors/CustomErrors';
-import {type IProjectService} from '../services/project.service';
+import { type IProjectService } from '../services/project.service';
 
-import {inject, injectable} from "tsyringe";
-import {type IProjectServiceLike} from "../services/project.service.like";
-import {type IProjectServiceView} from "../services/project.service.view";
+import { inject, injectable } from 'tsyringe';
+import { type IProjectServiceLike } from '../services/project.service.like';
+import { type IProjectServiceView } from '../services/project.service.view';
 
-const isProjectVisible = (v: unknown): v is ProjectVisible =>
-    v === 'public' || v === 'link' || v === 'private';
+const isProjectVisible = (v: unknown): v is ProjectVisible => v === 'public' || v === 'link' || v === 'private';
 
 @injectable()
 export class ProjectController {
     constructor(
-        @inject("IProjectService") private projectService:IProjectService,
-        @inject("IProjectServiceView") private projectServiceView:IProjectServiceView,
-        @inject("IProjectServiceLike") private projectServiceLike:IProjectServiceLike,
-    ) {
-    }
+        @inject('IProjectService') private projectService: IProjectService,
+        @inject('IProjectServiceView') private projectServiceView: IProjectServiceView,
+        @inject('IProjectServiceLike') private projectServiceLike: IProjectServiceLike,
+    ) {}
     public uploadMedia = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
         if (!req.body?.file) {
             throw new ValidationError('No file uploaded', 'file');
@@ -106,7 +104,7 @@ export class ProjectController {
         res.status(200).json({ success: true, data: updated, message: 'Project updated' });
     });
 
-     public getProjectById = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    public getProjectById = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
         const projectId = req.params.id;
         if (!projectId) {
             throw new ValidationError('Project ID is required', 'id');
@@ -190,7 +188,7 @@ export class ProjectController {
 
         const userId = req.user?.userId ?? undefined;
         const xff = req.headers['x-forwarded-for'] as string | undefined;
-        const ipList = xff?.split(',').map(ip => ip.trim()) || [];
+        const ipList = xff?.split(',').map((ip) => ip.trim()) || [];
         const ip = ipList[0] || req.ip;
 
         const view = await this.projectServiceView.recordProjectView(projectId, { userId, ip });

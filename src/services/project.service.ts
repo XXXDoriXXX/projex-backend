@@ -6,18 +6,21 @@ import crypto from 'crypto';
 import { ValidationError, NotFoundError, ForbiddenError, DatabaseError } from '../errors/CustomErrors';
 import { ensureAccess } from '../utils/encruceAcces';
 import { requireUserIdProjectId } from '../utils/requireUserIdProjectId';
-import {type IProjectRepository, ProjectRepository} from '../repositories/project.repository';
-import {inject, injectable} from "tsyringe";
-import {Project, ProjectMedia, Technology, User} from "@prisma/client";
-
+import { type IProjectRepository, ProjectRepository } from '../repositories/project.repository';
+import { inject, injectable } from 'tsyringe';
+import { Project, ProjectMedia, Technology, User } from '@prisma/client';
 
 export interface IProjectService {
-    getProjectById(id: string, token?: string, userId?: string): Promise<{
+    getProjectById(
+        id: string,
+        token?: string,
+        userId?: string,
+    ): Promise<{
         media: ProjectMedia[];
         technologies: Technology[];
         user?: User;
         likesCount: number;
-        viewsCount: number
+        viewsCount: number;
     }>;
     getUserProjects(userId: string): Promise<Project[]>;
     deleteProject(id: string, userId: string): Promise<Project>;
@@ -28,17 +31,19 @@ export interface IProjectService {
 }
 
 @injectable()
-export class ProjectService implements IProjectService{
-    constructor(
-        @inject("IProjectRepository") private repo: IProjectRepository,
-    ) {}
+export class ProjectService implements IProjectService {
+    constructor(@inject('IProjectRepository') private repo: IProjectRepository) {}
 
-    async getProjectById(id: string, token?: string, userId?: string):Promise<{
+    async getProjectById(
+        id: string,
+        token?: string,
+        userId?: string,
+    ): Promise<{
         media: ProjectMedia[];
         technologies: Technology[];
         user?: User;
         likesCount: number;
-        viewsCount: number
+        viewsCount: number;
     }> {
         try {
             const project = await this.repo.findById(id);
@@ -65,16 +70,13 @@ export class ProjectService implements IProjectService{
         }
     }
 
-    async getUserProjects(
-        userId: string ,
-        currentUserId?: string | undefined
-    ): Promise<Project[]> {
+    async getUserProjects(userId: string, currentUserId?: string | undefined): Promise<Project[]> {
         try {
             const projects = await this.repo.getUserProjects(userId);
             const isOwner = currentUserId === userId;
 
             if (!isOwner) {
-                return projects.filter(project => project.privateLinkToken === null);
+                return projects.filter((project) => project.privateLinkToken === null);
             }
 
             return projects;
@@ -84,7 +86,6 @@ export class ProjectService implements IProjectService{
             });
         }
     }
-
 
     async deleteProject(id: string, userId: string) {
         requireUserIdProjectId(id, userId);
@@ -131,7 +132,7 @@ export class ProjectService implements IProjectService{
         }
     }
 
-    async createProject(data: CreateProjectData):Promise<Project> {
+    async createProject(data: CreateProjectData): Promise<Project> {
         if (!data?.userId) {
             throw new ValidationError(`User ID is required`, `userId`);
         }
@@ -156,7 +157,7 @@ export class ProjectService implements IProjectService{
         }
     }
 
-    async changeProjectVisibility(id: string, userId: string, visible: ProjectVisible) :Promise<Project> {
+    async changeProjectVisibility(id: string, userId: string, visible: ProjectVisible): Promise<Project> {
         requireUserIdProjectId(id, userId);
 
         if (!visible) {

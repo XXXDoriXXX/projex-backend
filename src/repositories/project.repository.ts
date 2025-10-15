@@ -1,9 +1,8 @@
-
 import { CreateProjectData } from '../types/project/Project';
-import {prisma} from "../prisma";
-import {Project} from "@prisma/client";
-import {ProjectExists, ProjectWithDetails, ViewsAggregation} from "../types/project/project.types";
-import {CreatedProject} from "../types/project/ProjectCreate";
+import { prisma } from '../prisma';
+import { Project } from '@prisma/client';
+import { ProjectExists, ProjectWithDetails, ViewsAggregation } from '../types/project/project.types';
+import { CreatedProject } from '../types/project/ProjectCreate';
 import { injectable } from 'tsyringe';
 export interface IProjectRepository {
     isProjectExists(id: string): Promise<ProjectExists>;
@@ -11,16 +10,12 @@ export interface IProjectRepository {
     getViewsCount(projectId: string): Promise<ViewsAggregation>;
     getUserProjects(userId: string): Promise<ProjectWithDetails[]>;
     deleteProject(id: string, userId: string): Promise<Project>;
-    updateProject(
-        id: string,
-        previewUrlValue: string | null,
-        data: CreateProjectData
-    ): Promise<CreatedProject>;
+    updateProject(id: string, previewUrlValue: string | null, data: CreateProjectData): Promise<CreatedProject>;
     createProject(data: CreateProjectData): Promise<CreatedProject>;
     updateVisibility(id: string, token: string | null): Promise<Project>;
 }
 @injectable()
-export class ProjectRepository implements IProjectRepository{
+export class ProjectRepository implements IProjectRepository {
     async isProjectExists(id: string) {
         return prisma.project.findUnique({ where: { id } });
     }
@@ -55,7 +50,7 @@ export class ProjectRepository implements IProjectRepository{
             where: { id_userId: { id, userId } },
         });
     }
-    async updateProject(id: string, previewUrlValue: string | null, data: CreateProjectData):Promise<CreatedProject> {
+    async updateProject(id: string, previewUrlValue: string | null, data: CreateProjectData): Promise<CreatedProject> {
         return prisma.project.update({
             where: { id },
             data: {
@@ -87,7 +82,7 @@ export class ProjectRepository implements IProjectRepository{
             },
         });
     }
-    async createProject(data: CreateProjectData):Promise<CreatedProject> {
+    async createProject(data: CreateProjectData): Promise<CreatedProject> {
         return prisma.project.create({
             data: {
                 userId: data.userId,

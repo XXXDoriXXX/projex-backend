@@ -1,4 +1,4 @@
-import {Project, ProjectMedia, Technology, User} from "@prisma/client";
+import { Project, ProjectMedia, Technology, User } from '@prisma/client';
 
 export type ProjectWithDetails = Project & {
     media: ProjectMedia[];

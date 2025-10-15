@@ -1,6 +1,5 @@
-
-import { injectable } from "tsyringe";
-import jwt from "jsonwebtoken";
+import { injectable } from 'tsyringe';
+import jwt from 'jsonwebtoken';
 
 export interface TokenPayload {
     sub: string;
@@ -8,13 +7,9 @@ export interface TokenPayload {
     username: string;
 }
 
-export interface ITokenProvider {
-  
-}
+export interface ITokenProvider {}
 
 @injectable()
 export class JwtTokenProvider implements ITokenProvider {
-    private secret = process.env.JWT_SECRET || "MewMewMew";
-
-
+    private secret = process.env.JWT_SECRET || 'MewMewMew';
 }

@@ -3,8 +3,8 @@ import * as authService from './auth.service';
 
 import bcrypt from 'bcryptjs';
 import { AuthenticatedRequest } from '../src/middleware/auth';
-import {PrismaService} from "../src/prisma";
-const prisma = new PrismaService;
+import { PrismaService } from '../src/prisma';
+const prisma = new PrismaService();
 /*TODO refactor like project controller*/
 export const getCurrentUser = async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user?.userId;

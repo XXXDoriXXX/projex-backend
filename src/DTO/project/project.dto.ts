@@ -1,7 +1,6 @@
+import { z } from 'zod';
 
-import { z } from "zod";
-
-export const VisibilitySchema = z.enum(["public", "link", "private"]);
+export const VisibilitySchema = z.enum(['public', 'link', 'private']);
 export type ProjectVisible = z.infer<typeof VisibilitySchema>;
 
 const nonEmpty = z.string().trim().min(1);
@@ -10,11 +9,11 @@ const urlOptional = z
     .trim()
     .url()
     .optional()
-    .or(z.literal("").transform(() => undefined));
+    .or(z.literal('').transform(() => undefined));
 
 export const MediaItemDto = z.object({
     url: z.string().trim().url(),
-    type: z.enum(["image", "video", "file"]).optional(),
+    type: z.enum(['image', 'video', 'file']).optional(),
     caption: z.string().trim().max(300).optional(),
 });
 export type MediaItemDto = z.infer<typeof MediaItemDto>;
@@ -38,7 +37,10 @@ export const ChangeVisibilityDto = z.object({
 export type ChangeVisibilityDto = z.infer<typeof ChangeVisibilityDto>;
 
 export const ProjectIdParamDto = z.object({
-    id: z.string().uuid().or(z.string().regex(/^[A-Za-z0-9_-]{10,}$/)),
+    id: z
+        .string()
+        .uuid()
+        .or(z.string().regex(/^[A-Za-z0-9_-]{10,}$/)),
 });
 export type ProjectIdParamDto = z.infer<typeof ProjectIdParamDto>;
 
