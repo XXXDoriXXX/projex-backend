@@ -1,7 +1,7 @@
 export interface OAuthProfile {
     email: string;
     name: string;
-    avatar?: string;
+    avatar: string;
     provider: 'google' | 'github';
     providerId: string;
 }

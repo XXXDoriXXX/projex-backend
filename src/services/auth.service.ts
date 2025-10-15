@@ -54,7 +54,7 @@ export class AuthService implements IAuthService {
 
         const token = generateToken(user.id, user.username);
 
-        return { token, user: { id: user.id, username: user.username, email: user.email } };
+        return { token, user: { id: user.id, username: user.username, email: user.email, avatarUrl:user.avatarUrl } };
     }
     async register(username: string, email: string, password: string) {
         const existingUser = await this.authRepo.getUserByEmail(email);
