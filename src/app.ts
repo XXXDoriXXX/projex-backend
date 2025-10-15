@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import './di/projectContainer';
 import './di/authContainer';
+import'./di/userContainer'
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -13,6 +14,7 @@ import { requestId } from './middleware/request-id';
 import { httpLogger } from './middleware/http-logger';
 import { errorHandler } from './middleware/errorHandler';
 import { NotFoundError } from './errors/CustomErrors';
+import userRoute from "./routes/user.route";
 
 function parseAllowedOrigins(envValue?: string): string[] {
     if (!envValue) return [];
@@ -57,6 +59,7 @@ app.use(httpLogger);
 app.use('/api/status', statusRoute);
 app.use('/api/auth', authRoute);
 app.use('/api/project', projectRoute);
+app.use('/api/user',userRoute)
 
 app.get('/', (_req, res) => {
     res.json({ message: 'Projex API is running!' });
