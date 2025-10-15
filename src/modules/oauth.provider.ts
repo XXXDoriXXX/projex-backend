@@ -39,7 +39,7 @@ export class GithubOAuthProvider implements OAuthProvider {
             { client_id: this.clientId, client_secret: this.clientSecret, code },
             { headers: { Accept: "application/json" } }
         )
-        const token = tokenResp.data.accessToken;
+        const token = tokenResp.data.access_token;
         if (!token) throw new ValidationError("Invalid GitHub code");
         const [userRes, emailRes] = await Promise.all([
             axios.get("https://api.github.com/user", {
