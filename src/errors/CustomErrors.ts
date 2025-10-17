@@ -92,3 +92,20 @@ export class DatabaseError extends BaseError {
         };
     }
 }
+
+export class AppError extends BaseError{
+    readonly statusCode = 500;
+    readonly isOperational = true;
+    constructor(message: string, context?: Record<string, any>) {
+        super(message, 'APP_ERROR', context);
+    }
+    toJson() {
+        return {
+            type: this.name,
+            message: 'Application error occurred',
+            statusCode: this.statusCode,
+            errorCode: this.errorCode,
+            ...(this.context && { context: this.context }),
+        };
+    }
+}

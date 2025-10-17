@@ -36,6 +36,7 @@ model User {
   passwordResetToken       String?                  @unique
   passwordResetExpires     DateTime?
   projects                 Project[] // Projects authored by this user
+  uploadedMedia            ProjectMedia[]
   likes                    Like[]
   views                    View[]
   followers                Follow[]                 @relation("Following")
@@ -90,14 +91,26 @@ enum ProjectStatus {
   ARCHIVED // Archived
 }
 
+enum MediaStatus {
+  PENDING
+  ATTACHED
+}
+
 model ProjectMedia {
-  id        String    @id @default(cuid())
+  id        String      @id @default(cuid())
   type      MediaType
   url       String
-  project   Project   @relation(fields: [projectId], references: [id])
-  projectId String
+  status    MediaStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String?
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
 
   @@index([projectId])
+  @@index([userId])
 }
 
 model Technology {
