@@ -28,6 +28,7 @@ export interface IProjectService {
     createProject(data: CreateProjectData): Promise<Project>;
     setVisibility(id: string, token: string | null): Promise<Project>;
     changeProjectVisibility(id: string, userId: string, visible: ProjectVisible): Promise<Project>;
+    getAllTechnologies(): Promise<Technology[]>;
 }
 
 @injectable()
@@ -187,6 +188,13 @@ export class ProjectService implements IProjectService {
             default: {
                 throw new ValidationError(`Invalid visibility option`, `visible`);
             }
+        }
+    }
+    async getAllTechnologies(): Promise<Technology[]> {
+        try {
+            return await this.repo.getAllTechnologies();
+        } catch (error) {
+            throw new DatabaseError('Failed to fetch technologies');
         }
     }
 }

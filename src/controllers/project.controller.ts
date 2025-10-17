@@ -202,4 +202,8 @@ export class ProjectController {
             },
         });
     });
+    public getAllTechnologies = asyncHandler(async (_req: Request, res: Response) => {
+        const technologies = await this.projectService.getAllTechnologies();
+        res.status(200).json({ success: true, data: technologies });
+    });
 }

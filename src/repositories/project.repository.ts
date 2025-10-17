@@ -1,6 +1,6 @@
 import { CreateProjectData } from '../types/project/Project';
 import { prisma } from '../prisma';
-import { Project } from '@prisma/client';
+import {Project, Technology} from '@prisma/client';
 import { ProjectExists, ProjectWithDetails, ViewsAggregation } from '../types/project/project.types';
 import { CreatedProject } from '../types/project/ProjectCreate';
 import { injectable } from 'tsyringe';
@@ -13,6 +13,7 @@ export interface IProjectRepository {
     updateProject(id: string, previewUrlValue: string | null, data: CreateProjectData): Promise<CreatedProject>;
     createProject(data: CreateProjectData): Promise<CreatedProject>;
     updateVisibility(id: string, token: string | null): Promise<Project>;
+    getAllTechnologies(): Promise<Technology[]>;
 }
 @injectable()
 export class ProjectRepository implements IProjectRepository {
@@ -115,6 +116,11 @@ export class ProjectRepository implements IProjectRepository {
         return prisma.project.update({
             where: { id },
             data: { privateLinkToken: token },
+        });
+    }
+    async getAllTechnologies(): Promise<Technology[]> {
+        return prisma.technology.findMany({
+            orderBy: { name: 'asc' },
         });
     }
 }

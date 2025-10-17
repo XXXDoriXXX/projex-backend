@@ -19,4 +19,6 @@ router.patch('/visible/:id', authenticate, projectController.changeProjectVisibi
 router.post('/like/:id', authenticate, projectController.likeProject);
 router.delete('/like/:id', authenticate, projectController.unlikeProject);
 router.post('/view/:id', optionalAuthenticate, projectController.recordProjectView);
+
+router.get('/technology', projectController.getAllTechnologies);
 export default router;

@@ -41,7 +41,7 @@ export class AuthService implements IAuthService {
 
     async getUserById(id: string): Promise<User> {
         const user = await this.authRepo.getUserById(id);
-        if (!user) throw new Error('User not found');
+        if (!user) throw new NotFoundError('User not found');
         return user;
     }
     async login(email: string, password: string) {

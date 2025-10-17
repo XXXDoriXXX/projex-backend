@@ -16,6 +16,7 @@ export interface IUserProfile {
     id: string;
     username: string;
     avatarUrl?: string | null;
+    email?: string | null;
     bio?: string | null;
     projects: Project[];
     socialLinks: SocialMedia[];
@@ -26,14 +27,38 @@ export interface IUserProfile {
 }
 
 export interface IUserService {
-    getUserProfileByUsername(username: string): Promise<IUserProfile>;
+    getUserProfileByUsername(username: string): Promise<{
+        id: any;
+        username: any;
+        avatarUrl: any;
+        bio: any;
+        email: any;
+        projects: PublicProject[];
+        socialLinks: SocialMedia[];
+        followersCount: number;
+        followingCount: number;
+        projectsCount: number;
+        createdAt: any
+    }>;
 }
 
 @injectable()
 export class UserService implements IUserService {
     constructor(@inject('IUserRepository') private readonly userRepo: IUserRepository) {}
 
-    async getUserProfileByUsername(username:string): Promise<IUserProfile> {
+    async getUserProfileByUsername(username: string): Promise<{
+        id: any;
+        username: any;
+        avatarUrl: any;
+        bio: any;
+        email: any;
+        projects: PublicProject[];
+        socialLinks: SocialMedia[];
+        followersCount: number;
+        followingCount: number;
+        projectsCount: number;
+        createdAt: any
+    }> {
         const user = await this.userRepo.findByUsername(username);
 
         if (!user || !user.isActive) {
@@ -47,6 +72,7 @@ export class UserService implements IUserService {
             username: publicData.username,
             avatarUrl: publicData.avatarUrl,
             bio: publicData.bio,
+            email: publicData.email,
             projects: publicData.projects,
             socialLinks: publicData.socialLinks,
             followersCount: publicData._count.followers,

@@ -16,7 +16,7 @@ export class ProjectServiceView implements IProjectServiceView {
     ) {}
 
     async recordProjectView(projectId: string, opts?: { userId?: string; ip?: string; ipHash?: string }): Promise<View> {
-        console.log(opts);
+
         const userId = opts?.userId ?? null;
 
         if (!projectId) {
