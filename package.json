@@ -40,6 +40,8 @@
     },
     "dependencies": {
         "@azure/storage-blob": "^12.29.1",
+        "@ffmpeg-installer/ffmpeg": "^1.1.0",
+        "@ffprobe-installer/ffprobe": "^2.1.2",
         "@prisma/client": "^6.13.0",
         "axios": "^1.11.0",
         "bcryptjs": "^3.0.2",
