@@ -65,7 +65,7 @@ export class ProjectController {
             throw new ForbiddenError('Authentication required');
         }
 
-        const { title, description, githubUrl, demoUrl, media, technologies } = req.body ?? {};
+        const { title, description, githubUrl, demoUrl, mediaIds, technologies, subauthorIds, visible } = req.body ?? {};
         if (!title || typeof title !== 'string') {
             throw new ValidationError('Title is required and must be a string', 'title');
         }
@@ -79,8 +79,10 @@ export class ProjectController {
             description,
             githubUrl,
             demoUrl,
-            media,
+            mediaIds,
             technologies,
+            subauthorIds,
+            visible
         };
 
         const project = await this.projectService.createProject(projectData);

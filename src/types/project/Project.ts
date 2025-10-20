@@ -4,6 +4,8 @@ export type CreateProjectData = {
     description: string;
     githubUrl?: string;
     demoUrl?: string;
-    media?: { type: 'image' | 'video'; url: string }[];
+    mediaIds?: string[];
     technologies?: string[];
+    visible?: string;
+    subauthorIds?: string[];
 };

@@ -10,10 +10,16 @@ import { generateToken } from '../utils/generateToken';
 import { ValidationError } from '../errors/CustomErrors';
 import { type IGoogleOAuthProvider } from '../modules/oauth.provider';
 import { type IOAuthService } from './oauth.service';
-
+export interface UserInfo {
+    id: string;
+    email: string;
+    username: string;
+    avatarUrl?: string | null;
+}
 const MINUTES = (m: number) => m * 60 * 1000;
 export interface IAuthService {
     getUserById(id: string): Promise<User>;
+    getUserByEmail(email: string): Promise<UserInfo>;
 }
 @injectable()
 export class AuthService implements IAuthService {
@@ -44,6 +50,17 @@ export class AuthService implements IAuthService {
         if (!user) throw new NotFoundError('User not found');
         return user;
     }
+    async getUserByEmail(email: string): Promise<UserInfo> {
+        const user = await this.authRepo.getUserByEmail(email);
+        const userInfo: UserInfo = {
+            id: user?.id || '',
+            email: user?.email || '',
+            username: user?.username ?? 'null',
+            avatarUrl: user?.avatarUrl ?? 'null',
+        }
+        if (!user) throw new NotFoundError('User not found');
+        return userInfo;
+    }
     async login(email: string, password: string) {
         const user = await this.authRepo.getUserByEmail(email);
         if (!user) throw new ForbiddenError('User not found');
@@ -66,8 +83,9 @@ export class AuthService implements IAuthService {
         if (!EmailZ.safeParse(email).success) {
             throw new ValidationError('Invalid email');
         }
+        const avatarUrl = `https://cataas.com/cat/says/${username}`
         const passwordHash = await bcrypt.hash(password, 10);
-        const newUser = await this.authRepo.createUser(username, email, passwordHash, '');
+        const newUser = await this.authRepo.createUser(username, email, passwordHash, avatarUrl);
 
         const token = generateToken(newUser.id, newUser.username);
 
