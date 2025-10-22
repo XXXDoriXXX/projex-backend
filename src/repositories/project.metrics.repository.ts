@@ -8,6 +8,7 @@ export interface IProjectMetricsRepository {
     deleteLike(userId: string, projectId: string): Promise<Like>;
     upsertView(projectId: string, userId: string): Promise<View>;
     upsertAnonymousView(projectId: string, ipAddress: string): Promise<View>;
+    hasUserLiked(projectId: string, userId: string | undefined): Promise<boolean>;
 }
 @injectable()
 export class ProjectMetricsRepository implements IProjectMetricsRepository {
@@ -42,7 +43,22 @@ export class ProjectMetricsRepository implements IProjectMetricsRepository {
             },
         });
     }
+
+    async hasUserLiked(projectId: string, userId: string | undefined): Promise<boolean> {
+        if(!userId){
+            return false;
+        }
+        const like = await prisma.like.findFirst({
+            where: {
+                projectId: projectId,
+                userId: userId,
+            },
+            select: { id: true },
+        });
+        return !!like;
+    }
     async upsertAnonymousView(projectId: string, ipAddress: string): Promise<View> {
+
         return prisma.view.upsert({
             where: {
                 project_iphash: { projectId, ipHash: ipAddress },

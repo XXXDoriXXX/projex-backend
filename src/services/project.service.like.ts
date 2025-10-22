@@ -4,19 +4,20 @@ import { type IProjectMetricsRepository } from '../repositories/project.metrics.
 import { inject, injectable } from 'tsyringe';
 import { Like } from '@prisma/client';
 export interface IProjectServiceLike {
-    isLikeExist(userId: string, projectId: string): Promise<Like>;
+    isLikeExist(userId: string, projectId: string): Promise<boolean>;
     likeProject(projectId: string, userId: string): Promise<number>;
     unlikeProject(projectId: string, userId: string): Promise<number>;
 }
 @injectable()
 export class ProjectServiceLike implements IProjectServiceLike {
     constructor(@inject('IProjectMetricsRepository') private repo: IProjectMetricsRepository) {}
-    async isLikeExist(userId: string, projectId: string): Promise<Like> {
+    async isLikeExist(userId: string, projectId: string): Promise<boolean> {
         const existing = await this.repo.getLikeById(userId, projectId);
-        if (!existing) {
-            throw new NotFoundError(`Like`);
+        if (existing) {
+            return true;
         }
-        return existing;
+        return false;
+
     }
     async likeProject(projectId: string, userId: string): Promise<number> {
         requireUserIdProjectId(projectId, userId);

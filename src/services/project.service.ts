@@ -11,6 +11,7 @@ import { inject, injectable } from 'tsyringe';
 import { Project, ProjectMedia, Technology, User } from '@prisma/client';
 import {type IProjectMediaRepository} from "../repositories/project.media.repository";
 import {UserInfo} from "./auth.service";
+import type {IProjectMetricsRepository} from "../repositories/project.metrics.repository";
 
 export interface IProjectService {
     getProjectById(
@@ -37,7 +38,8 @@ export interface IProjectService {
 @injectable()
 export class ProjectService implements IProjectService {
     constructor(@inject('IProjectRepository') private repo: IProjectRepository,
-                @inject('IProjectMediaRepository') private mediaRepo: IProjectMediaRepository,) {}
+                @inject('IProjectMediaRepository') private mediaRepo: IProjectMediaRepository,
+               @inject('IProjectMetricsRepository') private metricsRepo: IProjectMetricsRepository ) {}
 
     async getProjectById(
         id: string,
@@ -50,6 +52,7 @@ export class ProjectService implements IProjectService {
         subauthors?: UserInfo[];
         likesCount: number;
         viewsCount: number;
+        isLiked: boolean;
     }> {
         try {
             const project = await this.repo.findById(id);
@@ -73,14 +76,18 @@ export class ProjectService implements IProjectService {
                 username: sa.username,
                 avatarUrl: sa.avatarUrl,
             })));
-            const viewsCount = await this.repo.getViewsCount(id);
 
+                const [viewsCount, isLiked] = await Promise.all([
+                    this.repo.getViewsCount(id),
+                    this.metricsRepo.hasUserLiked(id, userId)
+                ]);
             return {
                 ...rest,
                 author,
                 subauthors: subauthorsInfo,
                 likesCount: internalCount.likes,
                 viewsCount: viewsCount._sum.count || 0,
+                isLiked: isLiked,
             }as any;
         } catch (error) {
             if (error instanceof NotFoundError || error instanceof ForbiddenError) {
