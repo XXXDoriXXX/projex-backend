@@ -187,7 +187,8 @@ export class ProjectService implements IProjectService {
 
         await projectFieldValid(data);
         const mediaIds: string[] = data.mediaIds || [];
-        const projectToCreate = { ...data,mediaIds: undefined};
+        const previewId: string = data.previewId || '';
+        const projectToCreate = { ...data,mediaIds: undefined, previewId:undefined };
         let newProject: Project;
         try {
             newProject = await this.repo.createProject(projectToCreate);
@@ -201,6 +202,10 @@ export class ProjectService implements IProjectService {
             try {
 
                 await this.mediaRepo.attachMediaToProject(mediaIds, newProject.id, data.userId);
+                if(previewId){
+                    await this.repo.attachPreviewToProject(newProject.id,previewId)
+                }
+
             } catch (mediaError) {
                 console.warn(`[ProjectService] Failed to attach media ${mediaIds} to project ${newProject.id}.`, mediaError);
             }

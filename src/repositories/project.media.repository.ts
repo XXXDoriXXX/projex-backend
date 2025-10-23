@@ -55,6 +55,7 @@ export class ProjectMediaRepository implements IProjectMediaRepository{
             },
         });
     }
+
     async detachUnusedMedia(projectId: string, keepMediaIds: string[]): Promise<void> {
 
         const mediaToDetach = await prisma.projectMedia.findMany({

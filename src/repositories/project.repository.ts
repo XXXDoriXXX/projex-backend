@@ -14,6 +14,7 @@ export interface IProjectRepository {
     createProject(data: CreateProjectData): Promise<CreatedProject>;
     updateVisibility(id: string, token: string | null): Promise<Project>;
     getAllTechnologies(): Promise<Technology[]>;
+    attachPreviewToProject(projectId: string, mediaId: string): Promise<Project>;
 }
 @injectable()
 export class ProjectRepository implements IProjectRepository {
@@ -123,6 +124,19 @@ export class ProjectRepository implements IProjectRepository {
     async getAllTechnologies(): Promise<Technology[]> {
         return prisma.technology.findMany({
             orderBy: { name: 'asc' },
+        });
+    }
+    async attachPreviewToProject(projectId: string, mediaId: string): Promise<Project> {
+        const media = await prisma.projectMedia.findUnique({
+            where: { id: mediaId },
+            select: { url: true },
+        });
+        const previewUrl = media?.url ?? null;
+        return prisma.project.update({
+            where: { id: projectId },
+            data: {
+                previewUrl: previewUrl,
+            },
         });
     }
 

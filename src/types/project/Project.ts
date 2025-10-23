@@ -8,4 +8,5 @@ export type CreateProjectData = {
     technologies?: string[];
     visible?: string;
     subauthorIds?: string[];
+    previewId?: string;
 };
