@@ -19,6 +19,7 @@ export type UserWithProfile = User & {
 export interface IUserRepository {
     findByUsername(username: string): Promise<UserWithProfile | null>;
     updateUser(id: string, data: Prisma.UserUpdateInput): Promise<User>;
+    findByUsernameAuthor(username: string): Promise<UserWithProfile | null>;
 }
 
 @injectable()
@@ -39,6 +40,12 @@ export class UserRepository implements IUserRepository {
                         githubUrl: true,
                         demoUrl: true,
                         createdAt: true,
+                        technologies: true,
+                        _count: {
+                            select: {
+                                likes: true,
+                            },
+                        },
                     },
                 },
                 socialLinks: true,
@@ -52,7 +59,39 @@ export class UserRepository implements IUserRepository {
             },
         });
     }
-
+    async findByUsernameAuthor(username: string): Promise<UserWithProfile | null> {
+        return prisma.user.findUnique({
+            where: { username },
+            include: {
+                projects: {
+                    select: {
+                        id: true,
+                        title: true,
+                        description: true,
+                        previewUrl: true,
+                        githubUrl: true,
+                        demoUrl: true,
+                        createdAt: true,
+                        technologies: true,
+                        status: true,
+                        _count: {
+                            select: {
+                                likes: true,
+                            },
+                        },
+                    },
+                },
+                socialLinks: true,
+                _count: {
+                    select: {
+                        followers: true,
+                        following: true,
+                        projects: true,
+                    },
+                },
+            },
+        });
+    }
     async updateUser(id: string, data: Prisma.UserUpdateInput): Promise<User> {
         return prisma.user.update({
             where: { id },
