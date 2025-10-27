@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum HackathonRaterType {
+  PARTICIPANT
+  JUDGE
+  PUBLIC
+}
+
 enum MediaType {
   image
   video
@@ -36,6 +42,7 @@ model User {
   passwordResetToken       String?                  @unique
   passwordResetExpires     DateTime?
   projects                 Project[] // Projects authored by this user
+  judgedHackathons         Hackathon[]              @relation("HackathonJudges")
   uploadedMedia            ProjectMedia[]
   likes                    Like[]
   views                    View[]
@@ -81,7 +88,6 @@ model Project {
   likes             Like[] // Likes
   views             View[] // Views
 
-  @@unique([id, userId])
   @@index([userId])
 }
 
@@ -176,12 +182,17 @@ model Hackathon {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  author   User   @relation(fields: [authorId], references: [id])
-  authorId String
-
-  participants HackathonParticipant[]
-  themes       HackathonThemeCategory[] @relation("HackathonThemes")
-  projects     HackathonProject[]
+  author                    User                      @relation(fields: [authorId], references: [id])
+  authorId                  String
+  allowParticipantRating    Boolean                   @default(true)
+  allowPublicRating         Boolean                   @default(false)
+  participants              HackathonParticipant[]
+  themes                    HackathonThemeCategory[]  @relation("HackathonThemes")
+  judges                    User[]                    @relation("HackathonJudges")
+  projects                  HackathonProject[]
+  ratingCategories          HackathonRatingCategory[] @relation("HackathonRatingCategories")
+  HackathonRatingCategory   HackathonRatingCategory?  @relation(fields: [hackathonRatingCategoryId], references: [id])
+  hackathonRatingCategoryId String?
 }
 
 enum HackathonStatus {
@@ -205,7 +216,7 @@ model HackathonParticipant {
 
 model HackathonThemeCategory {
   id         String      @id @default(cuid())
-  name       String
+  name       String      @unique
   hackathons Hackathon[] @relation("HackathonThemes")
 }
 
@@ -224,9 +235,13 @@ model HackathonProject {
 
 model HackathonRatingCategory {
   id                     String                   @id @default(cuid())
-  name                   String // Наприклад: "Інноваційність", "Дизайн", "Корисність"
+  name                   String
   order                  Int
   HackathonProjectRating HackathonProjectRating[]
+  hackathons             Hackathon[]              @relation("HackathonRatingCategories")
+  Hackathon              Hackathon[]
+
+  @@unique([name, order])
 }
 
 model HackathonProjectRating {
@@ -234,6 +249,7 @@ model HackathonProjectRating {
   project            HackathonProject        @relation(fields: [hackathonProjectId], references: [id])
   hackathonProjectId String
   rater              User                    @relation(fields: [raterId], references: [id])
+  raterType          HackathonRaterType
   raterId            String
   category           HackathonRatingCategory @relation(fields: [categoryId], references: [id])
   categoryId         String
@@ -242,7 +258,7 @@ model HackathonProjectRating {
   comment   String?
   createdAt DateTime @default(now())
 
-  @@unique([hackathonProjectId, raterId, categoryId])
+  @@unique([hackathonProjectId, raterId, categoryId, raterType])
   @@index([hackathonProjectId])
   @@index([categoryId])
 }
