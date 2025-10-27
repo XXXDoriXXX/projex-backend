@@ -10,6 +10,7 @@ import cors from 'cors';
 import statusRoute from './routes/status.route';
 import authRoute from './routes/auth.route';
 import projectRoute from './routes/project.route';
+import hackathonRoute from './routes/hackathon.route';
 
 import { requestId } from './middleware/request-id';
 import { httpLogger } from './middleware/http-logger';
@@ -61,6 +62,7 @@ app.use('/api/status', statusRoute);
 app.use('/api/auth', authRoute);
 app.use('/api/project', projectRoute);
 app.use('/api/user',userRoute)
+app.use('/api/hackathon', hackathonRoute);
 
 app.get('/', (_req, res) => {
     res.json({ message: 'Projex API is running!' });
