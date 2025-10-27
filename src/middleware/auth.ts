@@ -4,7 +4,6 @@ import { prisma } from '../prisma';
 import { asyncHandler } from '../utils/asyncHandler';
 import { ForbiddenError } from '../errors/CustomErrors';
 import { NotFoundError } from 'routing-controllers';
-
 export const getUserById = async (id: string) => {
     return prisma.user.findUnique({
         where: { id },
@@ -18,6 +17,8 @@ export interface AuthenticatedRequest extends Request {
         userId: string;
         username: string;
     };
+    file?: Express.Multer.File;
+    files?: Express.Multer.File[] | { [fieldname: string]: Express.Multer.File[] };
 }
 
 interface TokenPayload extends jwt.JwtPayload {

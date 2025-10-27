@@ -10,6 +10,7 @@ import { type IProjectService } from '../services/project.service';
 import { inject, injectable } from 'tsyringe';
 import { type IProjectServiceLike } from '../services/project.service.like';
 import { type IProjectServiceView } from '../services/project.service.view';
+import {type IProjectServiceMedia} from "../services/project.service.media";
 
 const isProjectVisible = (v: unknown): v is ProjectVisible => v === 'public' || v === 'link' || v === 'private';
 
@@ -19,13 +20,43 @@ export class ProjectController {
         @inject('IProjectService') private projectService: IProjectService,
         @inject('IProjectServiceView') private projectServiceView: IProjectServiceView,
         @inject('IProjectServiceLike') private projectServiceLike: IProjectServiceLike,
+        @inject('IProjectServiceMedia') private projectServiceMedia: IProjectServiceMedia,
     ) {}
     public uploadMedia = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-        if (!req.body?.file) {
-            throw new ValidationError('No file uploaded', 'file');
+        const userId = req.user?.userId;
+        if (!userId) {
+            throw new ForbiddenError('Authentication required');
         }
-        // TODO: Додати S3 upload-логіку
-        res.status(501).json({ success: false, message: 'Not implemented' });
+
+        const file = req.file;
+        if (!file) {
+            throw new ValidationError(`File upload is required ${file}`, 'file');
+        }
+
+        const media = await this.projectServiceMedia.uploadMedia(userId, file);
+        res.status(201).json({
+            success: true,
+            message: 'Media uploaded and is pending attachment',
+            data: {
+                id: media.id,
+                url: media.url,
+                type: media.type,
+            },
+        });
+    });
+    public deleteMedia = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+        const userId = req.user?.userId;
+        if (!userId) {
+            throw new ForbiddenError('Authentication required');
+        }
+
+        const mediaId = req.params.id;
+        if (!mediaId) {
+            throw new ValidationError('Media ID is required', 'id');
+        }
+
+        await this.projectServiceMedia.deleteMedia(mediaId, userId);
+        res.status(200).json({ success: true, message: 'Media deleted' });
     });
 
     public createProject = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -34,7 +65,7 @@ export class ProjectController {
             throw new ForbiddenError('Authentication required');
         }
 
-        const { title, description, githubUrl, demoUrl, media, technologies } = req.body ?? {};
+        const { title, description, githubUrl, demoUrl, mediaIds, technologies, subauthorIds, visible , previewId} = req.body ?? {};
         if (!title || typeof title !== 'string') {
             throw new ValidationError('Title is required and must be a string', 'title');
         }
@@ -48,8 +79,11 @@ export class ProjectController {
             description,
             githubUrl,
             demoUrl,
-            media,
+            mediaIds,
             technologies,
+            subauthorIds,
+            visible,
+            previewId
         };
 
         const project = await this.projectService.createProject(projectData);
@@ -201,5 +235,9 @@ export class ProjectController {
                 userId: view.userId ?? null,
             },
         });
+    });
+    public getAllTechnologies = asyncHandler(async (_req: Request, res: Response) => {
+        const technologies = await this.projectService.getAllTechnologies();
+        res.status(200).json({ success: true, data: technologies });
     });
 }

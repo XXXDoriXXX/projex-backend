@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum HackathonRaterType {
+  PARTICIPANT
+  JUDGE
+  PUBLIC
+}
+
 enum MediaType {
   image
   video
@@ -21,7 +27,7 @@ model User {
   id                       String                   @id @default(cuid())
   email                    String                   @unique
   password                 String?
-  username                 String
+  username                 String                   @unique
   avatarUrl                String?
   bio                      String?
   githubId                 String?                  @unique
@@ -36,6 +42,8 @@ model User {
   passwordResetToken       String?                  @unique
   passwordResetExpires     DateTime?
   projects                 Project[] // Projects authored by this user
+  judgedHackathons         Hackathon[]              @relation("HackathonJudges")
+  uploadedMedia            ProjectMedia[]
   likes                    Like[]
   views                    View[]
   followers                Follow[]                 @relation("Following")
@@ -80,7 +88,6 @@ model Project {
   likes             Like[] // Likes
   views             View[] // Views
 
-  @@unique([id, userId])
   @@index([userId])
 }
 
@@ -90,14 +97,26 @@ enum ProjectStatus {
   ARCHIVED // Archived
 }
 
+enum MediaStatus {
+  PENDING
+  ATTACHED
+}
+
 model ProjectMedia {
-  id        String    @id @default(cuid())
+  id        String      @id @default(cuid())
   type      MediaType
   url       String
-  project   Project   @relation(fields: [projectId], references: [id])
-  projectId String
+  status    MediaStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String?
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
 
   @@index([projectId])
+  @@index([userId])
 }
 
 model Technology {
@@ -163,12 +182,17 @@ model Hackathon {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  author   User   @relation(fields: [authorId], references: [id])
-  authorId String
+  author                 User                      @relation(fields: [authorId], references: [id])
+  authorId               String
+  allowParticipantRating Boolean                   @default(true)
+  allowPublicRating      Boolean                   @default(false)
+  participants           HackathonParticipant[]
+  themes                 HackathonThemeCategory[]  @relation("HackathonThemes")
+  judges                 User[]                    @relation("HackathonJudges")
+  projects               HackathonProject[]
+  ratingCategories       HackathonRatingCategory[] @relation("HackathonRatingCategories")
 
-  participants HackathonParticipant[]
-  themes       HackathonThemeCategory[] @relation("HackathonThemes")
-  projects     HackathonProject[]
+  // --- ЗАЙВІ ПОЛЯ ВИДАЛЕНО ---
 }
 
 enum HackathonStatus {
@@ -181,7 +205,7 @@ model HackathonParticipant {
   id          String    @id @default(cuid())
   user        User      @relation(fields: [userId], references: [id])
   userId      String
-  hackathon   Hackathon @relation(fields: [hackathonId], references: [id])
+  hackathon   Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
   hackathonId String
 
   joinedAt DateTime @default(now())
@@ -192,15 +216,15 @@ model HackathonParticipant {
 
 model HackathonThemeCategory {
   id         String      @id @default(cuid())
-  name       String
+  name       String      @unique
   hackathons Hackathon[] @relation("HackathonThemes")
 }
 
 model HackathonProject {
   id          String    @id @default(cuid())
-  hackathon   Hackathon @relation(fields: [hackathonId], references: [id])
+  hackathon   Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
   hackathonId String
-  project     Project   @relation(fields: [projectId], references: [id])
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId   String
 
   ratings HackathonProjectRating[]
@@ -211,16 +235,22 @@ model HackathonProject {
 
 model HackathonRatingCategory {
   id                     String                   @id @default(cuid())
-  name                   String // Наприклад: "Інноваційність", "Дизайн", "Корисність"
+  name                   String
   order                  Int
   HackathonProjectRating HackathonProjectRating[]
+  hackathons             Hackathon[]              @relation("HackathonRatingCategories")
+
+  // --- ЗАЙВЕ ПОЛЕ ВИДАЛЕНО ---
+
+  @@unique([name, order])
 }
 
 model HackathonProjectRating {
   id                 String                  @id @default(cuid())
-  project            HackathonProject        @relation(fields: [hackathonProjectId], references: [id])
+  project            HackathonProject        @relation(fields: [hackathonProjectId], references: [id], onDelete: Cascade)
   hackathonProjectId String
   rater              User                    @relation(fields: [raterId], references: [id])
+  raterType          HackathonRaterType
   raterId            String
   category           HackathonRatingCategory @relation(fields: [categoryId], references: [id])
   categoryId         String
@@ -229,7 +259,7 @@ model HackathonProjectRating {
   comment   String?
   createdAt DateTime @default(now())
 
-  @@unique([hackathonProjectId, raterId, categoryId])
+  @@unique([hackathonProjectId, raterId, categoryId, raterType])
   @@index([hackathonProjectId])
   @@index([categoryId])
 }

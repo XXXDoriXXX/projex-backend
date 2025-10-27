@@ -25,7 +25,7 @@ export class GoogleOAuthProvider implements OAuthProvider {
         return {
             email: payload.email,
             name: payload.name ?? payload.email.split('@')[0],
-            avatar: payload.picture,
+            avatar: payload.picture ?? 'https://www.gravatar.com/avatar/?d=retro',
             provider: 'google',
             providerId: payload.sub,
         };

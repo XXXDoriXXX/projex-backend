@@ -9,6 +9,9 @@ import { requireUserIdProjectId } from '../utils/requireUserIdProjectId';
 import { type IProjectRepository, ProjectRepository } from '../repositories/project.repository';
 import { inject, injectable } from 'tsyringe';
 import { Project, ProjectMedia, Technology, User } from '@prisma/client';
+import {type IProjectMediaRepository} from "../repositories/project.media.repository";
+import {UserInfo} from "./auth.service";
+import type {IProjectMetricsRepository} from "../repositories/project.metrics.repository";
 
 export interface IProjectService {
     getProjectById(
@@ -19,6 +22,7 @@ export interface IProjectService {
         media: ProjectMedia[];
         technologies: Technology[];
         user?: User;
+        subauthors?: UserInfo[];
         likesCount: number;
         viewsCount: number;
     }>;
@@ -28,11 +32,14 @@ export interface IProjectService {
     createProject(data: CreateProjectData): Promise<Project>;
     setVisibility(id: string, token: string | null): Promise<Project>;
     changeProjectVisibility(id: string, userId: string, visible: ProjectVisible): Promise<Project>;
+    getAllTechnologies(): Promise<Technology[]>;
 }
 
 @injectable()
 export class ProjectService implements IProjectService {
-    constructor(@inject('IProjectRepository') private repo: IProjectRepository) {}
+    constructor(@inject('IProjectRepository') private repo: IProjectRepository,
+                @inject('IProjectMediaRepository') private mediaRepo: IProjectMediaRepository,
+               @inject('IProjectMetricsRepository') private metricsRepo: IProjectMetricsRepository ) {}
 
     async getProjectById(
         id: string,
@@ -42,8 +49,10 @@ export class ProjectService implements IProjectService {
         media: ProjectMedia[];
         technologies: Technology[];
         user?: User;
+        subauthors?: UserInfo[];
         likesCount: number;
         viewsCount: number;
+        isLiked: boolean;
     }> {
         try {
             const project = await this.repo.findById(id);
@@ -54,14 +63,32 @@ export class ProjectService implements IProjectService {
 
             await ensureAccess(project, token, userId);
 
-            const { _count: internalCount, ...rest } = project;
-            const viewsCount = await this.repo.getViewsCount(id);
+            const { _count: internalCount, user,subauthors, ...rest } = project;
+            const author:UserInfo = {
+                id: user.id,
+                email: user.email,
+                username: user.username,
+                avatarUrl: user.avatarUrl,
+            }
+            const subauthorsInfo: UserInfo[] | undefined = subauthors?.map((sa => ({
+                id: sa.id,
+                email: sa.email,
+                username: sa.username,
+                avatarUrl: sa.avatarUrl,
+            })));
 
+                const [viewsCount, isLiked] = await Promise.all([
+                    this.repo.getViewsCount(id),
+                    this.metricsRepo.hasUserLiked(id, userId)
+                ]);
             return {
                 ...rest,
+                author,
+                subauthors: subauthorsInfo,
                 likesCount: internalCount.likes,
                 viewsCount: viewsCount._sum.count || 0,
-            };
+                isLiked: isLiked,
+            }as any;
         } catch (error) {
             if (error instanceof NotFoundError || error instanceof ForbiddenError) {
                 throw error;
@@ -116,20 +143,41 @@ export class ProjectService implements IProjectService {
         }
 
         await projectFieldValid(data);
-
+        const newMediaIds: string[] = data.mediaIds || [];
         let previewUrlValue: string | null = project.previewUrl;
-        if (!previewUrlValue && data.media && data.media.length > 0) {
-            previewUrlValue = data.media[0].url;
-        }
+        if (newMediaIds.length > 0) {
+            const firstMedia = await this.mediaRepo.getMediaById(newMediaIds[0]);
+            if (firstMedia) {
+                previewUrlValue = firstMedia.url;
+            }
+        } else if (newMediaIds.length === 0) {
 
+            previewUrlValue = null;
+        }
+        const projectToUpdate = { ...data, mediaIds: undefined } as any;
+
+        let updatedProject: Project;
         try {
-            return await this.repo.updateProject(id, previewUrlValue, data);
+            updatedProject = await this.repo.updateProject(id, previewUrlValue, projectToUpdate);
         } catch (err: any) {
             if (err?.code === `P2002`) {
                 throw new ValidationError(`Project with this title already exists`, `title`);
             }
             throw new DatabaseError(`Failed to update project. ${err.message}`, { id });
         }
+        if (newMediaIds.length > 0) {
+            try {
+                await this.mediaRepo.attachMediaToProject(newMediaIds, id, data.userId);
+            } catch (mediaError) {
+                console.warn(`[ProjectService] Failed to attach new media ${newMediaIds} to project ${id}.`, mediaError);
+            }
+        }
+        try {
+            await this.mediaRepo.detachUnusedMedia(id, newMediaIds);
+        } catch (cleanupError) {
+            console.warn(`[ProjectService] Failed to detach old media from project ${id}.`, cleanupError);
+        }
+        return updatedProject;
     }
 
     async createProject(data: CreateProjectData): Promise<Project> {
@@ -138,15 +186,31 @@ export class ProjectService implements IProjectService {
         }
 
         await projectFieldValid(data);
-
+        const mediaIds: string[] = data.mediaIds || [];
+        const previewId: string = data.previewId || '';
+        const projectToCreate = { ...data,mediaIds: undefined, previewId:undefined };
+        let newProject: Project;
         try {
-            return await this.repo.createProject(data);
+            newProject = await this.repo.createProject(projectToCreate);
         } catch (err: any) {
             if (err?.code === `P2002`) {
                 throw new ValidationError(`Project with this title already exists`, `title`);
             }
             throw new DatabaseError(`Failed to create project. ${err.message}`);
         }
+        if (mediaIds.length > 0) {
+            try {
+
+                await this.mediaRepo.attachMediaToProject(mediaIds, newProject.id, data.userId);
+                if(previewId){
+                    await this.repo.attachPreviewToProject(newProject.id,previewId)
+                }
+
+            } catch (mediaError) {
+                console.warn(`[ProjectService] Failed to attach media ${mediaIds} to project ${newProject.id}.`, mediaError);
+            }
+        }
+        return newProject;
     }
 
     async setVisibility(id: string, token: string | null): Promise<Project> {
@@ -187,6 +251,13 @@ export class ProjectService implements IProjectService {
             default: {
                 throw new ValidationError(`Invalid visibility option`, `visible`);
             }
+        }
+    }
+    async getAllTechnologies(): Promise<Technology[]> {
+        try {
+            return await this.repo.getAllTechnologies();
+        } catch (error) {
+            throw new DatabaseError('Failed to fetch technologies');
         }
     }
 }

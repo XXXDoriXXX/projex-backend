@@ -6,8 +6,10 @@ import { validateProject } from '../middleware/project/validateProject';
 import { authenticate, optionalAuthenticate } from '../middleware/auth';
 import { ProjectController } from '../controllers/project.controller';
 import { container } from 'tsyringe';
+import multer from "multer";
 const projectController = container.resolve(ProjectController);
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
 router.post('/create', validateProject, authenticate, projectController.createProject);
 router.get('/user/:id', projectController.getUserProjects);
 router.delete('/:id', authenticate, projectController.deleteProject);
@@ -19,4 +21,8 @@ router.patch('/visible/:id', authenticate, projectController.changeProjectVisibi
 router.post('/like/:id', authenticate, projectController.likeProject);
 router.delete('/like/:id', authenticate, projectController.unlikeProject);
 router.post('/view/:id', optionalAuthenticate, projectController.recordProjectView);
+
+router.get('/technology', projectController.getAllTechnologies);
+
+router.post('/media/upload', authenticate,upload.single('file'), projectController.uploadMedia);
 export default router;
