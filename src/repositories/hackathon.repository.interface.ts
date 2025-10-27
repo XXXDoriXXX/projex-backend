@@ -21,6 +21,7 @@ export interface IHackathonRepository {
     create(data: Prisma.HackathonCreateInput): Promise<Hackathon>;
     update(hackathonId: string, data: Prisma.HackathonUpdateInput): Promise<Hackathon>;
     delete(hackathonId: string, authorId: string): Promise<void>;
+    deleteById(hackathonId: string): Promise<void>
     findById(hackathonId: string): Promise<HackathonWithDetails | null>;
     findMany(status?: HackathonStatus): Promise<Hackathon[]>;
 

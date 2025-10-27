@@ -52,6 +52,11 @@ export class HackathonRepository implements IHackathonRepository {
             where: { id: hackathonId, authorId },
         });
     }
+    async deleteById(hackathonId: string): Promise<void> {
+        await prisma.hackathon.delete({
+            where: { id: hackathonId },
+        });
+    }
 
     async findById(hackathonId: string): Promise<HackathonWithDetails | null> {
         return prisma.hackathon.findUnique({
@@ -179,7 +184,7 @@ export class HackathonRepository implements IHackathonRepository {
     ): Promise<LeaderboardEntry[]> {
 
         const whereClause: Prisma.HackathonProjectRatingWhereInput = {
-            hackathonProject: {
+            project: {
                 hackathonId: hackathonId,
             },
             raterType: raterType,

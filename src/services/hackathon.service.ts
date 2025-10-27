@@ -115,8 +115,17 @@ export class HackathonService implements IHackathonService {
 
     async deleteHackathon(hackathonId: string, userId: string): Promise<void> {
 
+        const hackathon = await this.hackathonRepo.findById(hackathonId);
+        if (!hackathon) {
+            throw new NotFoundError('Hackathon', hackathonId);
+        }
+
+        if (hackathon.authorId !== userId) {
+            throw new ForbiddenError('You do not have permission to delete this hackathon.');
+        }
+
         try {
-            await this.hackathonRepo.delete(hackathonId, userId);
+            await this.hackathonRepo.deleteById(hackathonId);
         } catch (err: any) {
             if (err.code === 'P2025') {
                 throw new NotFoundError('Hackathon', hackathonId);
