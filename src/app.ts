@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import './di/projectContainer';
 import './di/authContainer';
 import'./di/userContainer'
+import './di/hackathonContainer';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
