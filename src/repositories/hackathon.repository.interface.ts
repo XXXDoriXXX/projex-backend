@@ -14,7 +14,7 @@ import {
     HackathonWithDetails,
     HackathonProjectWithDetails,
     LeaderboardEntry,
-    RateProjectDto,
+    RateProjectDto, HackathonProjectForAggregation, HackathonWithDetailsFromRepo,
 } from '../types/hackathon/hackathon.types';
 
 export interface IHackathonRepository {
@@ -22,7 +22,7 @@ export interface IHackathonRepository {
     update(hackathonId: string, data: Prisma.HackathonUpdateInput): Promise<Hackathon>;
     delete(hackathonId: string, authorId: string): Promise<void>;
     deleteById(hackathonId: string): Promise<void>
-    findById(hackathonId: string): Promise<HackathonWithDetails | null>;
+    findById(hackathonId: string): Promise<HackathonWithDetailsFromRepo | null>;
     findMany(status?: HackathonStatus): Promise<Hackathon[]>;
 
     findParticipant(hackathonId: string, userId: string): Promise<HackathonParticipant | null>;
@@ -49,4 +49,6 @@ export interface IHackathonRepository {
 
     getThemeCategories(): Promise<HackathonThemeCategory[]>;
     getRatingCategories(): Promise<HackathonRatingCategory[]>;
+
+    findUserProjectsInHackathon(hackathonId: string, userId: string): Promise<HackathonProjectForAggregation[]>;
 }

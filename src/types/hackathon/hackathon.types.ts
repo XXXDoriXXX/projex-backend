@@ -10,86 +10,141 @@ import {
     Project,
     Prisma,
     HackathonStatus,
-    HackathonRaterType,
+    HackathonRaterType, ProjectStatus,
 } from '@prisma/client';
 
-// DTO для створення хакатону
 export interface CreateHackathonDto {
     title: string;
     description: string;
-    startDate: string; // ISO Date string
-    endDate: string; // ISO Date string
-
-    // ID існуючих
+    startDate: string;
+    endDate: string;
     themeIds?: string[];
     ratingCategoryIds?: string[];
     judgeIds?: string[];
-
-    // Створення нових
     newThemes?: string[];
     newRatingCategories?: { name: string; order: number }[];
-
-    // Налаштування
     allowParticipantRating: boolean;
     allowPublicRating: boolean;
 }
-
-// DTO для оновлення (часткове)
+export interface HackathonProjectSummary {
+    hpId: string;
+    id: string;
+    title: string;
+    description: string;
+    previewUrl: string | null;
+    githubUrl: string | null;
+    demoUrl: string | null;
+    status: ProjectStatus;
+    likesCount: number;
+    viewsCount: number;
+    technologies: string[];
+    createdAt: Date;
+}
 export type UpdateHackathonDto = Partial<CreateHackathonDto>;
-
-// DTO для подачі проекту
 export interface SubmitProjectDto {
     projectId: string;
 }
-
-// DTO для оцінювання
 export interface RateProjectDto {
     categoryId: string;
-    rating: number; // Наприклад, 1-10
+    rating: number;
     comment?: string;
 }
 
-// =================================================================
-// ТИПИ ДЛЯ PRISMA (для чистоти коду в сервісах)
-// =================================================================
+export const safeUserSelect = {
+    select: {
+        id: true,
+        username: true,
+        avatarUrl: true
+    }
+};
 
-// Визначаємо, що ми хочемо отримувати при запиті "деталей"
-const hackathonWithDetails = Prisma.validator<Prisma.HackathonDefaultArgs>()({
-    include: {
-        author: true,
-        judges: true,
+export const hackathonWithDetailsValidator = Prisma.validator<Prisma.HackathonDefaultArgs>()({
+    include: { // Головний include для Hackathon залишається
+        author: safeUserSelect,
+        judges: safeUserSelect,
         themes: true,
         ratingCategories: true,
         participants: {
             include: {
-                user: true, // Включаємо юзера, що приєднався
+                user: safeUserSelect,
             },
         },
         projects: {
             include: {
-                project: true, // Включаємо сам проект
-            },
+                project: {
+                    select: {
+                        id: true,
+                        title: true,
+                        description: true,
+                        previewUrl: true,
+                        githubUrl: true,
+                        demoUrl: true,
+                        status: true,
+                        createdAt: true,
+                        technologies: true,
+                        _count: {
+                            select: { likes: true }
+                        }
+                    }
+                }
+            }
         },
     },
 });
 
-// Тип для детального хакатону
-export type HackathonWithDetails = Prisma.HackathonGetPayload<typeof hackathonWithDetails>;
 
-// Тип для проекту, поданого на хакатон
+export const hackathonDetailsInclude = {
+    author: safeUserSelect,
+    judges: safeUserSelect,
+    themes: true,
+    ratingCategories: true,
+    participants: { include: { user: safeUserSelect } },
+    projects: {
+        include: {
+            project: {
+                select: {
+                    id: true,
+                    title: true,
+                    description: true,
+                    previewUrl: true,
+                    githubUrl: true,
+                    demoUrl: true,
+                    status: true,
+                    createdAt: true,
+                    technologies: true,
+                    _count: {
+                        select: { likes: true }
+                    }
+                }
+            }
+        }
+    },
+};
+export type HackathonWithDetailsFromRepo = Prisma.HackathonGetPayload<{
+    include: typeof hackathonDetailsInclude
+}>;
+export interface HackathonWithDetails extends Omit<HackathonWithDetailsFromRepo, 'projects'> {
+    projects: HackathonProjectSummary[];
+}
+
+
 const hackathonProjectWithDetails = Prisma.validator<Prisma.HackathonProjectDefaultArgs>()({
     include: {
         project: {
             include: {
-                user: true, // Автор проекту
-                subauthors: true, // Співавтори
+                user: safeUserSelect,
+                subauthors: safeUserSelect,
             },
         },
         hackathon: {
             include: {
-                author: true,
-                judges: true,
-                participants: true,
+                author: safeUserSelect,
+                judges: safeUserSelect,
+                participants: {
+                    include: {
+                        user: safeUserSelect
+                    }
+                },
                 ratingCategories: true,
             },
         },
@@ -100,10 +155,24 @@ export type HackathonProjectWithDetails = Prisma.HackathonProjectGetPayload<
     typeof hackathonProjectWithDetails
 >;
 
-// Тип для результатів лідерборду
+const hackathonProjectForAggregation = Prisma.validator<Prisma.HackathonProjectDefaultArgs>()({
+    include: {
+        project: {
+            include: {
+                user: safeUserSelect,
+                subauthors: safeUserSelect,
+                technologies: true,
+                _count: {
+                    select: { likes: true }
+                }
+            }
+        }
+    }
+});
+export type HackathonProjectForAggregation = Prisma.HackathonProjectGetPayload<typeof hackathonProjectForAggregation>;
+
 export interface LeaderboardEntry {
     projectId: string;
     projectTitle: string;
     totalScore: number;
-    // Можна додати деталі проекту, якщо потрібно
 }

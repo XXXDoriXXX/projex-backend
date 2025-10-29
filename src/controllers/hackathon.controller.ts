@@ -102,7 +102,7 @@ export class HackathonController {
         if (!userId) {
             throw new ForbiddenError('Authentication required');
         }
-        const { hpId } = req.params; // HackathonProject ID
+        const { hpId } = req.params;
         await this.hackathonService.removeProject(hpId, userId);
         res.status(200).json({ success: true, message: 'Project submission removed' });
     });
@@ -139,5 +139,17 @@ export class HackathonController {
     public getRatingCategories = asyncHandler(async (req: Request, res: Response) => {
         const categories = await this.hackathonService.getRatingCategories();
         res.status(200).json({ success: true, data: categories });
+    });
+
+    public getMyProjects = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+        const userId = req.user?.userId;
+        if (!userId) {
+            throw new ForbiddenError('Authentication required');
+        }
+
+        const { id } = req.params;
+
+        const projects = await this.hackathonService.getUserProjectsInHackathon(id, userId);
+        res.status(200).json({ success: true, data: projects });
     });
 }

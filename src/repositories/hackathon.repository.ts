@@ -18,17 +18,13 @@ import {
     HackathonProjectWithDetails,
     LeaderboardEntry,
     RateProjectDto,
+    HackathonProjectForAggregation,
+    HackathonWithDetailsFromRepo,
+    hackathonDetailsInclude,
+    safeUserSelect,
 } from '../types/hackathon/hackathon.types';
 import { IHackathonRepository } from './hackathon.repository.interface';
 
-const hackathonDetailsInclude = {
-    author: true,
-    judges: true,
-    themes: true,
-    ratingCategories: true,
-    participants: { include: { user: true } },
-    projects: { include: { project: true } },
-};
 
 @injectable()
 export class HackathonRepository implements IHackathonRepository {
@@ -47,7 +43,6 @@ export class HackathonRepository implements IHackathonRepository {
     }
 
     async delete(hackathonId: string, authorId: string): Promise<void> {
-
         await prisma.hackathon.delete({
             where: { id: hackathonId, authorId },
         });
@@ -58,7 +53,7 @@ export class HackathonRepository implements IHackathonRepository {
         });
     }
 
-    async findById(hackathonId: string): Promise<HackathonWithDetails | null> {
+    async findById(hackathonId: string): Promise<HackathonWithDetailsFromRepo | null> {
         return prisma.hackathon.findUnique({
             where: { id: hackathonId },
             include: hackathonDetailsInclude,
@@ -100,22 +95,25 @@ export class HackathonRepository implements IHackathonRepository {
         });
     }
 
-
     async findHackathonProjectById(hpId: string): Promise<HackathonProjectWithDetails | null> {
         return prisma.hackathonProject.findUnique({
             where: { id: hpId },
             include: {
                 project: {
                     include: {
-                        user: true,
-                        subauthors: true,
+                        user: safeUserSelect,
+                        subauthors: safeUserSelect,
                     },
                 },
                 hackathon: {
                     include: {
-                        author: true,
-                        judges: true,
-                        participants: true,
+                        author: safeUserSelect,
+                        judges: safeUserSelect,
+                        participants: {
+                            include: {
+                                user: safeUserSelect
+                            }
+                        },
                         ratingCategories: true,
                     },
                 },
@@ -259,5 +257,29 @@ export class HackathonRepository implements IHackathonRepository {
 
     async getRatingCategories(): Promise<HackathonRatingCategory[]> {
         return prisma.hackathonRatingCategory.findMany({ orderBy: { order: 'asc' } });
+    }
+
+    async findUserProjectsInHackathon(hackathonId: string, userId: string): Promise<HackathonProjectForAggregation[]> {
+        return prisma.hackathonProject.findMany({
+            where: {
+                hackathonId: hackathonId,
+                project: {
+                    userId: userId,
+                },
+            },
+
+            include: {
+                project: {
+                    include: {
+                        user: safeUserSelect,
+                        subauthors: safeUserSelect,
+                        technologies: true,
+                        _count: {
+                            select: { likes: true }
+                        }
+                    }
+                }
+            },
+        });
     }
 }

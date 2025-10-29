@@ -13,7 +13,7 @@ import {
     UpdateHackathonDto,
     RateProjectDto,
     HackathonWithDetails,
-    LeaderboardEntry,
+    LeaderboardEntry, HackathonPublicProjectResponse,
 } from '../types/hackathon/hackathon.types';
 
 export interface IHackathonService {
@@ -34,4 +34,6 @@ export interface IHackathonService {
 
     getThemeCategories(): Promise<HackathonThemeCategory[]>;
     getRatingCategories(): Promise<HackathonRatingCategory[]>;
+
+    getUserProjectsInHackathon(hackathonId: string, userId: string): Promise<HackathonPublicProjectResponse[]>;
 }

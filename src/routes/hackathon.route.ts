@@ -22,5 +22,5 @@ router.post('/project/:hpId/rate', authenticate, hackathonController.rateProject
 router.get('/:id/leaderboard', hackathonController.getLeaderboard);
 router.get('/categories/themes', hackathonController.getThemeCategories);
 router.get('/categories/ratings', hackathonController.getRatingCategories);
-
+router.get('/:id/my-projects', authenticate, hackathonController.getMyProjects);
 export default router;

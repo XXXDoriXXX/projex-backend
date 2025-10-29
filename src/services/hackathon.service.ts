@@ -9,7 +9,7 @@ import {
     UpdateHackathonDto,
     RateProjectDto,
     HackathonWithDetails,
-    LeaderboardEntry,
+    LeaderboardEntry, HackathonProjectSummary,
 } from '../types/hackathon/hackathon.types';
 import {
     Hackathon,
@@ -135,11 +135,54 @@ export class HackathonService implements IHackathonService {
     }
 
     async getHackathonById(hackathonId: string): Promise<HackathonWithDetails> {
-        const hackathon = await this.hackathonRepo.findById(hackathonId);
-        if (!hackathon) {
+        const hackathonFromRepo = await this.hackathonRepo.findById(hackathonId);
+        if (!hackathonFromRepo) {
             throw new NotFoundError('Hackathon', hackathonId);
         }
-        return hackathon;
+
+        const projectSummaries: HackathonProjectSummary[] = [];
+
+        const validSubmissions = hackathonFromRepo.projects.filter(submission => submission.project);
+        const projectIds = validSubmissions.map(submission => submission.project.id);
+        const viewsMap = new Map<string, number>();
+        if (projectIds.length > 0) {
+            const viewsCounts = await Promise.all(
+                projectIds.map(id => this.projectRepo.getViewsCount(id))
+            );
+            projectIds.forEach((id, index) => {
+                viewsMap.set(id, viewsCounts[index]._sum.count || 0);
+            });
+        }
+        for (const submission of hackathonFromRepo.projects) {
+            const { project } = submission;
+            if (!project) continue;
+
+            const technologyNames = project.technologies.map((tech: any) => tech.name);
+            const likesCount = project._count?.likes || 0;
+            const viewsCount = viewsMap.get(project.id) || 0;
+
+            projectSummaries.push({
+                hpId: submission.id,
+                id: project.id,
+                title: project.title,
+                description: project.description,
+                previewUrl: project.previewUrl,
+                githubUrl: project.githubUrl,
+                demoUrl: project.demoUrl,
+                status: project.status,
+                likesCount: likesCount,
+                viewsCount: viewsCount,
+                technologies: technologyNames,
+                createdAt: project.createdAt,
+            });
+        }
+
+        const result: HackathonWithDetails = {
+            ...hackathonFromRepo,
+            projects: projectSummaries,
+        };
+
+        return result;
     }
 
     async getAllHackathons(status?: HackathonStatus): Promise<Hackathon[]> {
@@ -186,8 +229,7 @@ export class HackathonService implements IHackathonService {
             throw new NotFoundError('Project', projectId);
         }
         const isAuthor = project.userId === userId;
-        // (Припускаємо, що isProjectExists повертає subauthors, якщо ні - треба змінити логіку)
-        // const isSubauthor = project.subauthors?.some(sa => sa.id === userId);
+
         if (!isAuthor /* && !isSubauthor */) {
             throw new ForbiddenError('You must be the author of the project to submit it.');
         }
@@ -230,7 +272,9 @@ export class HackathonService implements IHackathonService {
 
         const hackathon = hp.hackathon;
         const project = hp.project;
-
+        if(hackathon.status !== 'RATING'){
+            throw new ForbiddenError('Project rating is not allowed at this stage.');
+        }
 
         let raterType: HackathonRaterType;
         const isJudge = hackathon.authorId === raterId || hackathon.judges.some((j) => j.id === raterId);
@@ -346,5 +390,42 @@ export class HackathonService implements IHackathonService {
             allThemes.length > 0 ? allThemes : undefined,
             allRatingCategories.length > 0 ? allRatingCategories : undefined
         ];
+    }
+    async getUserProjectsInHackathon(hackathonId: string, userId: string): Promise<HackathonProjectSummary[]> {
+
+        const submissions = await this.hackathonRepo.findUserProjectsInHackathon(hackathonId, userId);
+
+        if (!submissions || submissions.length === 0) {
+            return [];
+        }
+
+        const publicProjects: HackathonProjectSummary[] = [];
+
+        for (const submission of submissions) {
+            const { project } = submission;
+
+            const viewsAggregation = await this.projectRepo.getViewsCount(project.id);
+            const viewsCount = viewsAggregation._sum.count || 0;
+
+            const technologyNames = project.technologies.map(tech => tech.name);
+
+            publicProjects.push({
+                hpId: submission.id,
+                id: project.id,
+                title: project.title,
+                description: project.description,
+                previewUrl: project.previewUrl,
+                githubUrl: project.githubUrl,
+                demoUrl: project.demoUrl,
+                createdAt: project.createdAt,
+                status: project.status,
+                likesCount: project._count.likes,
+                viewsCount: viewsCount,
+                technologies: technologyNames,
+            });
+        }
+
+
+        return publicProjects;
     }
 }
