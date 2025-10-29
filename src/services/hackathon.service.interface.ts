@@ -13,7 +13,7 @@ import {
     UpdateHackathonDto,
     RateProjectDto,
     HackathonWithDetails,
-    LeaderboardEntry, HackathonPublicProjectResponse,
+    LeaderboardEntry, PaginatedHackathonsResponse, GetHackathonsQueryDto, HackathonProjectSummary,
 } from '../types/hackathon/hackathon.types';
 
 export interface IHackathonService {
@@ -21,7 +21,7 @@ export interface IHackathonService {
     updateHackathon(hackathonId: string, userId: string, dto: UpdateHackathonDto): Promise<Hackathon>;
     deleteHackathon(hackathonId: string, userId: string): Promise<void>;
     getHackathonById(hackathonId: string): Promise<HackathonWithDetails>;
-    getAllHackathons(status?: HackathonStatus): Promise<Hackathon[]>;
+    getAllHackathons(query: GetHackathonsQueryDto): Promise<PaginatedHackathonsResponse>;
 
     joinHackathon(hackathonId: string, userId: string): Promise<HackathonParticipant>;
     leaveHackathon(hackathonId: string, userId: string): Promise<void>;
@@ -35,5 +35,5 @@ export interface IHackathonService {
     getThemeCategories(): Promise<HackathonThemeCategory[]>;
     getRatingCategories(): Promise<HackathonRatingCategory[]>;
 
-    getUserProjectsInHackathon(hackathonId: string, userId: string): Promise<HackathonPublicProjectResponse[]>;
+    getUserProjectsInHackathon(hackathonId: string, userId: string): Promise<HackathonProjectSummary[]>;
 }

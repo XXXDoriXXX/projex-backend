@@ -14,7 +14,7 @@ import {
     HackathonWithDetails,
     HackathonProjectWithDetails,
     LeaderboardEntry,
-    RateProjectDto, HackathonProjectForAggregation, HackathonWithDetailsFromRepo,
+    RateProjectDto, HackathonProjectForAggregation, HackathonWithDetailsFromRepo, PaginatedHackathonsResponse,
 } from '../types/hackathon/hackathon.types';
 
 export interface IHackathonRepository {
@@ -23,8 +23,14 @@ export interface IHackathonRepository {
     delete(hackathonId: string, authorId: string): Promise<void>;
     deleteById(hackathonId: string): Promise<void>
     findById(hackathonId: string): Promise<HackathonWithDetailsFromRepo | null>;
-    findMany(status?: HackathonStatus): Promise<Hackathon[]>;
-
+    findMany(options: {
+        status?: HackathonStatus | 'ALL';
+        limit: number;
+        cursor?: string;
+        sortOrder: 'asc' | 'desc';
+        search?: string;
+        themeIds?: string[];
+    }): Promise<PaginatedHackathonsResponse>;
     findParticipant(hackathonId: string, userId: string): Promise<HackathonParticipant | null>;
     addParticipant(hackathonId: string, userId: string): Promise<HackathonParticipant>;
     removeParticipant(participantId: string): Promise<void>;

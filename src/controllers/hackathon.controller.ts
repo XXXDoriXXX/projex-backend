@@ -6,7 +6,12 @@ import { inject, injectable } from 'tsyringe';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { type IHackathonService } from '../services/hackathon.service.interface';
-import { CreateHackathonDto, RateProjectDto, UpdateHackathonDto } from '../types/hackathon/hackathon.types';
+import {
+    CreateHackathonDto,
+    GetHackathonsQueryDto,
+    RateProjectDto,
+    UpdateHackathonDto
+} from '../types/hackathon/hackathon.types';
 import { ValidationError, ForbiddenError } from '../errors/CustomErrors';
 import { HackathonStatus } from '@prisma/client';
 
@@ -53,14 +58,43 @@ export class HackathonController {
     });
 
     public getAllHackathons = asyncHandler(async (req: Request, res: Response) => {
-        const status = req.query.status as HackathonStatus | undefined;
-        if (status && !Object.values(HackathonStatus).includes(status)) {
-            throw new ValidationError('Invalid status filter', 'status');
-        }
-        const hackathons = await this.hackathonService.getAllHackathons(status);
-        res.status(200).json({ success: true, data: hackathons });
-    });
 
+        const { status, limit, cursor, sortOrder, search, themes } = req.query;
+        let validatedStatus: HackathonStatus | 'ALL' | undefined;
+
+        if (status) {
+            if (status === 'ALL') {
+                validatedStatus = 'ALL';
+            } else if (Object.values(HackathonStatus).includes(status as HackathonStatus)) {
+                validatedStatus = status as HackathonStatus;
+            } else {
+                throw new ValidationError('Invalid status filter', 'status');
+            }
+        }
+
+        if (sortOrder && !['asc', 'desc'].includes(sortOrder as string)) {
+            throw new ValidationError("Invalid sortOrder. Must be 'asc' or 'desc'", 'sortOrder');
+        }
+
+        const themeIds = (themes as string | undefined)?.split(',').filter(id => id.length > 0);
+
+        const queryDto: GetHackathonsQueryDto = {
+            status: validatedStatus as HackathonStatus |"ALL"| undefined,
+            limit: limit ? parseInt(limit as string, 10) : undefined,
+            cursor: cursor as string | undefined,
+            sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+            search: search as string | undefined,
+            themeIds: themeIds,
+        };
+
+        if (limit && (isNaN(queryDto.limit!) || queryDto.limit! < 1)) {
+            throw new ValidationError('Invalid limit. Must be a positive number', 'limit');
+        }
+
+        const result = await this.hackathonService.getAllHackathons(queryDto);
+
+        res.status(200).json({ success: true, ...result });
+    });
 
     public joinHackathon = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
         const userId = req.user?.userId;

@@ -59,7 +59,7 @@ export const safeUserSelect = {
 };
 
 export const hackathonWithDetailsValidator = Prisma.validator<Prisma.HackathonDefaultArgs>()({
-    include: { // Головний include для Hackathon залишається
+    include: {
         author: safeUserSelect,
         judges: safeUserSelect,
         themes: true,
@@ -175,4 +175,16 @@ export interface LeaderboardEntry {
     projectId: string;
     projectTitle: string;
     totalScore: number;
+}
+export interface GetHackathonsQueryDto {
+    limit?: number;
+    cursor?: string;
+    status?: HackathonStatus | 'ALL';
+    sortOrder?: 'asc' | 'desc';
+    search?: string;
+    themeIds?: string[];
+}
+export interface PaginatedHackathonsResponse {
+    data: Hackathon[];
+    nextCursor: string | null;
 }

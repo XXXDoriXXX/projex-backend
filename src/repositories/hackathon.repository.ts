@@ -21,14 +21,26 @@ import {
     HackathonProjectForAggregation,
     HackathonWithDetailsFromRepo,
     hackathonDetailsInclude,
-    safeUserSelect,
+    safeUserSelect, PaginatedHackathonsResponse,
 } from '../types/hackathon/hackathon.types';
 import { IHackathonRepository } from './hackathon.repository.interface';
+import {ValidationError} from "../errors/CustomErrors";
 
-
+type Decoded = { id: string; startTs: number };
 @injectable()
 export class HackathonRepository implements IHackathonRepository {
 
+    private encodeCursor(item: { id: string; startDate: Date }) {
+        return Buffer.from(JSON.stringify({
+            id: item.id,
+            startTs: item.startDate.getTime(),
+        })).toString('base64');
+    }
+
+    private decodeCursor(cursor: string): { id: string; startDate: Date } {
+        const { id, startTs } = JSON.parse(Buffer.from(cursor, 'base64').toString('utf8')) as Decoded;
+        return { id, startDate: new Date(startTs) };
+    }
     async create(data: Prisma.HackathonCreateInput): Promise<Hackathon> {
         return prisma.hackathon.create({
             data,
@@ -60,17 +72,93 @@ export class HackathonRepository implements IHackathonRepository {
         });
     }
 
-    async findMany(status?: HackathonStatus): Promise<Hackathon[]> {
-        return prisma.hackathon.findMany({
-            where: {
-                status: status,
-            },
-            orderBy: {
-                startDate: 'desc',
-            },
-        });
-    }
+    // src/repositories/hackathon.repository.ts (ВИПРАВЛЕНО)
 
+    async findMany(options: {
+        status?: HackathonStatus | 'ALL';
+        limit: number;
+        cursor?: string;
+        sortOrder: 'asc' | 'desc';
+        search?: string;
+        themeIds?: string[];
+    }): Promise<PaginatedHackathonsResponse> {
+
+        const { status, limit, cursor, sortOrder, search, themeIds } = options;
+
+        const take = limit + 1;
+        const isDesc = sortOrder === 'desc';
+
+        // --- ФІКС: Будуємо всі умови фільтрації в одному масиві AND ---
+        const whereConditions: Prisma.HackathonWhereInput[] = [];
+
+        if (status && status !== 'ALL') {
+            whereConditions.push({ status });
+        }
+
+        if (search) {
+            whereConditions.push({
+                OR: [
+                    { title: { contains: search, mode: 'insensitive' } },
+                    { description: { contains: search, mode: 'insensitive' } },
+                ],
+            });
+        }
+
+        if (themeIds && themeIds.length > 0) {
+            whereConditions.push({
+                themes: {
+                    some: {
+                        id: { in: themeIds },
+                    },
+                },
+            });
+        }
+
+        const orderBy = [
+            { startDate: sortOrder },
+            { id: sortOrder },
+        ];
+
+        // --- ФІКС: Додаємо логіку курсору до того ж масиву AND ---
+        if (cursor) {
+            const decodedCursor = this.decodeCursor(cursor);
+            const operator = isDesc ? 'lt' : 'gt';
+
+            whereConditions.push({
+                OR: [
+                    {
+                        startDate: { [operator]: decodedCursor.startDate },
+                    },
+                    {
+                        startDate: decodedCursor.startDate,
+                        id: { [operator]: decodedCursor.id },
+                    },
+                ],
+            });
+        }
+
+        const items = await prisma.hackathon.findMany({
+            take,
+            // --- ФІКС: Використовуємо єдиний масив AND ---
+            where: {
+                AND: whereConditions,
+            },
+            orderBy: orderBy as any,
+        });
+
+        let nextCursor: string | null = null;
+        if (items.length > limit) {
+            const nextItem = items.pop();
+            if (nextItem) {
+                nextCursor = this.encodeCursor(nextItem);
+            }
+        }
+
+        return {
+            data: items,
+            nextCursor,
+        };
+    }
 
     async findParticipant(hackathonId: string, userId: string): Promise<HackathonParticipant | null> {
         return prisma.hackathonParticipant.findUnique({

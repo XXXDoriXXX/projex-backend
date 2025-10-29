@@ -9,7 +9,7 @@ import {
     UpdateHackathonDto,
     RateProjectDto,
     HackathonWithDetails,
-    LeaderboardEntry, HackathonProjectSummary,
+    LeaderboardEntry, HackathonProjectSummary, GetHackathonsQueryDto, PaginatedHackathonsResponse,
 } from '../types/hackathon/hackathon.types';
 import {
     Hackathon,
@@ -23,7 +23,7 @@ import {
     HackathonRaterType,
 } from '@prisma/client';
 import { DatabaseError, ForbiddenError, NotFoundError, ValidationError } from '../errors/CustomErrors';
-import { type IProjectRepository } from '../repositories/project.repository'; // Потрібен для перевірки прав на проект
+import { type IProjectRepository } from '../repositories/project.repository';
 
 @injectable()
 export class HackathonService implements IHackathonService {
@@ -35,7 +35,7 @@ export class HackathonService implements IHackathonService {
 
     async createHackathon(authorId: string, dto: CreateHackathonDto): Promise<Hackathon> {
         this.validateHackathonDates(dto.startDate, dto.endDate);
-
+        this.validateHackathonTitleAndDescription(dto.title, dto.description);
         const data: Prisma.HackathonCreateInput = {
             title: dto.title,
             description: dto.description,
@@ -60,7 +60,6 @@ export class HackathonService implements IHackathonService {
             data.ratingCategories = ratingCategories
                 ? { connect: ratingCategories.map((rc) => ({ id: rc.id })) }
                 : undefined;
-
             return await this.hackathonRepo.create(data);
         } catch (err: any) {
             if (err.code === 'P2002') {
@@ -79,6 +78,7 @@ export class HackathonService implements IHackathonService {
                 dto.endDate || hackathon.endDate.toISOString(),
             );
         }
+        this.validateHackathonTitleAndDescription(dto.title, dto.description);
 
         const data: Prisma.HackathonUpdateInput = {
             title: dto.title,
@@ -185,10 +185,22 @@ export class HackathonService implements IHackathonService {
         return result;
     }
 
-    async getAllHackathons(status?: HackathonStatus): Promise<Hackathon[]> {
-        return this.hackathonRepo.findMany(status);
-    }
+    async getAllHackathons(query: GetHackathonsQueryDto): Promise<PaginatedHackathonsResponse> {
+        const { status, cursor, search, themeIds } = query;
 
+
+        const limit = query.limit ? Math.min(query.limit, 50) : 20;
+        const sortOrder = query.sortOrder || 'desc';
+
+        return this.hackathonRepo.findMany({
+            status,
+            limit,
+            cursor,
+            sortOrder,
+            search,
+            themeIds,
+        });
+    }
 
 
     async joinHackathon(hackathonId: string, userId: string): Promise<HackathonParticipant> {
@@ -345,7 +357,17 @@ export class HackathonService implements IHackathonService {
             throw new ValidationError('End date must be after start date', 'endDate');
         }
     }
-
+    private validateHackathonTitleAndDescription(title: string | undefined, description: string | undefined): void {
+        if(!title || !description) {
+            throw new ValidationError('Title and description are required', 'title/description');
+        }
+        if(title.length<3 || title.length>100 || title.trim().length===0 || typeof title !== 'string'){
+            throw new ValidationError('Title must be between 3 and 100 characters', 'title');
+        }
+        if(description.length<10 || description.length>1000 || description.trim().length===0 || typeof description !== 'string'){
+            throw new ValidationError('Description must be between 10 and 1000 characters', 'description');
+        }
+    }
     private async getHackathonAndCheckOwnership(hackathonId: string, userId: string): Promise<Hackathon> {
         const hackathon = await this.hackathonRepo.findById(hackathonId);
         if (!hackathon) {
@@ -372,7 +394,6 @@ export class HackathonService implements IHackathonService {
             allThemes.push(...createdThemes);
         }
         if (themeIds.length > 0) {
-            // (В ідеалі, тут має бути перевірка, чи ці ID існують)
             allThemes.push(...themeIds.map(id => ({ id } as HackathonThemeCategory)));
         }
 
@@ -382,7 +403,6 @@ export class HackathonService implements IHackathonService {
             allRatingCategories.push(...createdCats);
         }
         if (ratingCategoryIds.length > 0) {
-            // (Так само, потрібна перевірка ID)
             allRatingCategories.push(...ratingCategoryIds.map(id => ({ id } as HackathonRatingCategory)));
         }
 
