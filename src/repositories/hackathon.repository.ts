@@ -72,8 +72,6 @@ export class HackathonRepository implements IHackathonRepository {
         });
     }
 
-    // src/repositories/hackathon.repository.ts (ВИПРАВЛЕНО)
-
     async findMany(options: {
         status?: HackathonStatus | 'ALL';
         limit: number;
@@ -87,8 +85,6 @@ export class HackathonRepository implements IHackathonRepository {
 
         const take = limit + 1;
         const isDesc = sortOrder === 'desc';
-
-        // --- ФІКС: Будуємо всі умови фільтрації в одному масиві AND ---
         const whereConditions: Prisma.HackathonWhereInput[] = [];
 
         if (status && status !== 'ALL') {
@@ -119,7 +115,6 @@ export class HackathonRepository implements IHackathonRepository {
             { id: sortOrder },
         ];
 
-        // --- ФІКС: Додаємо логіку курсору до того ж масиву AND ---
         if (cursor) {
             const decodedCursor = this.decodeCursor(cursor);
             const operator = isDesc ? 'lt' : 'gt';
@@ -139,7 +134,6 @@ export class HackathonRepository implements IHackathonRepository {
 
         const items = await prisma.hackathon.findMany({
             take,
-            // --- ФІКС: Використовуємо єдиний масив AND ---
             where: {
                 AND: whereConditions,
             },

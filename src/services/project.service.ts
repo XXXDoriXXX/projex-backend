@@ -12,6 +12,7 @@ import { Project, ProjectMedia, Technology, User } from '@prisma/client';
 import {type IProjectMediaRepository} from "../repositories/project.media.repository";
 import {UserInfo} from "./auth.service";
 import type {IProjectMetricsRepository} from "../repositories/project.metrics.repository";
+import {GetProjectsQueryDto, PaginatedProjectsResponse, ProjectSummaryDto} from "../types/project/project.list.types";
 
 export interface IProjectService {
     getProjectById(
@@ -33,6 +34,7 @@ export interface IProjectService {
     setVisibility(id: string, token: string | null): Promise<Project>;
     changeProjectVisibility(id: string, userId: string, visible: ProjectVisible): Promise<Project>;
     getAllTechnologies(): Promise<Technology[]>;
+    getAllProjects(query: GetProjectsQueryDto): Promise<PaginatedProjectsResponse>;
 }
 
 @injectable()
@@ -97,6 +99,55 @@ export class ProjectService implements IProjectService {
         }
     }
 
+    async getAllProjects(query: GetProjectsQueryDto): Promise<PaginatedProjectsResponse> {
+        const {
+            limit = 20,
+            cursor,
+            sortOrder = 'desc',
+            sortBy = 'createdAt',
+            search,
+            authorId,
+            technologyIds,
+        } = query;
+
+        const validatedLimit = Math.min(limit, 50);
+
+        if (sortBy !== 'createdAt') {
+            throw new ValidationError("Сортування підтримується лише за 'createdAt'", 'sortBy');
+        }
+
+        try {
+            const repoResult = await this.repo.findMany({
+                limit: validatedLimit,
+                cursor,
+                sortOrder,
+                sortBy,
+                search,
+                authorId,
+                technologyIds,
+            });
+
+            if (repoResult.data.length === 0) {
+                return { data: [], nextCursor: null };
+            }
+
+            const projectIds = repoResult.data.map((p) => p.id);
+
+            const viewsMap = await this.repo.getViewsCounts(projectIds);
+
+            const dataWithViews: ProjectSummaryDto[] = repoResult.data.map((project) => ({
+                ...project,
+                viewsCount: viewsMap.get(project.id) || 0,
+            }));
+
+            return {
+                data: dataWithViews,
+                nextCursor: repoResult.nextCursor,
+            };
+        } catch (err: any) {
+            throw new DatabaseError(`Не вдалося завантажити проекти: ${err.message}`);
+        }
+    }
     async getUserProjects(userId: string, currentUserId?: string | undefined): Promise<Project[]> {
         try {
             const projects = await this.repo.getUserProjects(userId);

@@ -142,17 +142,10 @@ export class HackathonService implements IHackathonService {
 
         const projectSummaries: HackathonProjectSummary[] = [];
 
-        const validSubmissions = hackathonFromRepo.projects.filter(submission => submission.project);
-        const projectIds = validSubmissions.map(submission => submission.project.id);
-        const viewsMap = new Map<string, number>();
-        if (projectIds.length > 0) {
-            const viewsCounts = await Promise.all(
-                projectIds.map(id => this.projectRepo.getViewsCount(id))
-            );
-            projectIds.forEach((id, index) => {
-                viewsMap.set(id, viewsCounts[index]._sum.count || 0);
-            });
-        }
+        const validSubmissions = hackathonFromRepo.projects.filter((submission) => submission.project);
+        const projectIds = validSubmissions.map((submission) => submission.project.id);
+
+        const viewsMap = await this.projectRepo.getViewsCounts(projectIds);
         for (const submission of hackathonFromRepo.projects) {
             const { project } = submission;
             if (!project) continue;
@@ -184,7 +177,6 @@ export class HackathonService implements IHackathonService {
 
         return result;
     }
-
     async getAllHackathons(query: GetHackathonsQueryDto): Promise<PaginatedHackathonsResponse> {
         const { status, cursor, search, themeIds } = query;
 
@@ -412,22 +404,23 @@ export class HackathonService implements IHackathonService {
         ];
     }
     async getUserProjectsInHackathon(hackathonId: string, userId: string): Promise<HackathonProjectSummary[]> {
-
         const submissions = await this.hackathonRepo.findUserProjectsInHackathon(hackathonId, userId);
 
         if (!submissions || submissions.length === 0) {
             return [];
         }
 
+        const projectIds = submissions.map(submission => submission.project.id);
+
+        const viewsMap = await this.projectRepo.getViewsCounts(projectIds);
+
         const publicProjects: HackathonProjectSummary[] = [];
 
         for (const submission of submissions) {
             const { project } = submission;
+            const viewsCount = viewsMap.get(project.id) || 0;
 
-            const viewsAggregation = await this.projectRepo.getViewsCount(project.id);
-            const viewsCount = viewsAggregation._sum.count || 0;
-
-            const technologyNames = project.technologies.map(tech => tech.name);
+            const technologyNames = project.technologies.map((tech) => tech.name);
 
             publicProjects.push({
                 hpId: submission.id,
@@ -444,7 +437,6 @@ export class HackathonService implements IHackathonService {
                 technologies: technologyNames,
             });
         }
-
 
         return publicProjects;
     }

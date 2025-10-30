@@ -11,6 +11,7 @@ import { inject, injectable } from 'tsyringe';
 import { type IProjectServiceLike } from '../services/project.service.like';
 import { type IProjectServiceView } from '../services/project.service.view';
 import {type IProjectServiceMedia} from "../services/project.service.media";
+import {GetProjectsQueryDto} from "../types/project/project.list.types";
 
 const isProjectVisible = (v: unknown): v is ProjectVisible => v === 'public' || v === 'link' || v === 'private';
 
@@ -43,6 +44,38 @@ export class ProjectController {
                 type: media.type,
             },
         });
+    });
+    public getAllProjects = asyncHandler(async (req: Request, res: Response) => {
+        const { limit, cursor, sortOrder, sortBy, search, authorId, technologies } = req.query;
+
+        if (sortOrder && !['asc', 'desc'].includes(sortOrder as string)) {
+            throw new ValidationError("Невірний 'sortOrder'. Має бути 'asc' або 'desc'", 'sortOrder');
+        }
+        if (sortBy && sortBy !== 'createdAt') {
+            throw new ValidationError("Невірний 'sortBy'. Має бути 'createdAt'", 'sortBy');
+        }
+
+        const technologyIds = (technologies as string | undefined)
+            ?.split(',')
+            .filter((id) => id.length > 0);
+
+        const queryDto: GetProjectsQueryDto = {
+            limit: limit ? parseInt(limit as string, 10) : undefined,
+            cursor: cursor as string | undefined,
+            sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+            sortBy: sortBy as 'createdAt' | undefined,
+            search: search as string | undefined,
+            authorId: authorId as string | undefined,
+            technologyIds: technologyIds,
+        };
+
+        if (limit && (isNaN(queryDto.limit!) || queryDto.limit! < 1)) {
+            throw new ValidationError("Невірний 'limit'. Має бути додатнім числом", 'limit');
+        }
+
+        const result = await this.projectService.getAllProjects(queryDto);
+
+        res.status(200).json({ success: true, ...result });
     });
     public deleteMedia = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
         const userId = req.user?.userId;
