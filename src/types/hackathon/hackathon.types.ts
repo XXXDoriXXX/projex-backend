@@ -188,3 +188,44 @@ export interface PaginatedHackathonsResponse {
     data: Hackathon[];
     nextCursor: string | null;
 }
+export interface AggregatedLeaderboardData {
+    projectTotalScores: {
+        hackathonProjectId: string;
+        _sum: { rating: number | null };
+    }[];
+    detailedRatings: {
+        hackathonProjectId: string;
+        hackathonRatingCategoryId: string;
+        raterType: HackathonRaterType;
+        _avg: { rating: number | null };
+        _count: { rating: number | null };
+    }[];
+    projects: {
+        id: string;
+        project: { id: string; title: string };
+    }[];
+    categories: {
+        id: string;
+        name: string;
+    }[];
+}
+
+export interface LeaderboardResponse {
+    projectId: string;
+    projectTitle: string;
+    totalScore: number;
+    categoryScores: CategoryScore[];
+}
+
+export interface CategoryScore {
+    categoryId: string;
+    categoryName: string;
+    averageScore: number;
+    scoresByVoterType: ScoreByVoterType[];
+}
+
+export interface ScoreByVoterType {
+    type: HackathonRaterType;
+    averageScore: number;
+    voteCount: number;
+}

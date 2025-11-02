@@ -319,22 +319,14 @@ export class HackathonService implements IHackathonService {
         return this.hackathonRepo.rateProject(hpId, raterId, raterType, { categoryId, rating, comment });
     }
 
-    async getLeaderboard(hackathonId: string, raterType?: string): Promise<LeaderboardEntry[]> {
+    async getLeaderboard(hackathonId: string): Promise<any[]> {
 
         const hackathon = await this.hackathonRepo.findById(hackathonId);
         if (!hackathon) {
             throw new NotFoundError('Hackathon', hackathonId);
         }
 
-        let validRaterType: HackathonRaterType | undefined;
-        if (raterType) {
-            if (!Object.values(HackathonRaterType).includes(raterType as HackathonRaterType)) {
-                throw new ValidationError('Invalid rater type specified', 'type');
-            }
-            validRaterType = raterType as HackathonRaterType;
-        }
-
-        return this.hackathonRepo.getLeaderboard(hackathonId, validRaterType);
+        return this.hackathonRepo.getLeaderboard(hackathonId);
     }
 
 

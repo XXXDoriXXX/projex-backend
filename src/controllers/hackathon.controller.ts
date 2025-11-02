@@ -165,9 +165,8 @@ export class HackathonController {
 
     public getLeaderboard = asyncHandler(async (req: Request, res: Response) => {
         const { id } = req.params;
-        const raterType = req.query.type as string | undefined;
 
-        const leaderboard = await this.hackathonService.getLeaderboard(id, raterType);
+        const leaderboard = await this.hackathonService.getLeaderboard(id);
         res.status(200).json({ success: true, data: leaderboard });
     });
 

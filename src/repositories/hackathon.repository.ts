@@ -260,53 +260,145 @@ export class HackathonRepository implements IHackathonRepository {
 
     async getLeaderboard(
         hackathonId: string,
-        raterType?: HackathonRaterType,
-    ): Promise<LeaderboardEntry[]> {
+    ): Promise<any[]> {
 
-        const whereClause: Prisma.HackathonProjectRatingWhereInput = {
-            project: {
-                hackathonId: hackathonId,
+        const rawAggregations = await prisma.hackathonProjectRating.groupBy({
+            by: ['hackathonProjectId', 'categoryId', 'raterType'],
+            where: {
+                project: {
+                    hackathonId: hackathonId,
+                },
             },
-            raterType: raterType,
-        };
-
-        const results = await prisma.hackathonProjectRating.groupBy({
-            by: ['hackathonProjectId'],
-            where: whereClause,
+            _avg: {
+                rating: true,
+            },
+            _count: {
+                rating: true,
+            },
             _sum: {
                 rating: true,
             },
-            orderBy: {
-                _sum: {
-                    rating: 'desc',
-                },
-            },
         });
 
-        const projectIds = results.map((r) => r.hackathonProjectId);
+        if (rawAggregations.length === 0) {
+            return [];
+        }
+        const projectIds = [...new Set(rawAggregations.map((r) => r.hackathonProjectId))];
+        const categoryIds = [...new Set(rawAggregations.map((r) => r.categoryId))];
+
         const projects = await prisma.hackathonProject.findMany({
             where: {
                 id: { in: projectIds },
             },
-            include: {
+            select: {
+                id: true,
                 project: {
                     select: {
                         title: true,
-                        id: true,
                     },
                 },
             },
         });
 
+        const categories = await prisma.hackathonRatingCategory.findMany({
+            where: {
+                id: { in: categoryIds },
+            },
+            select: {
+                id: true,
+                name: true,
+            },
+        });
+
         const projectMap = new Map(projects.map((p) => [p.id, p.project.title]));
+        const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
 
-        return results.map((r) => ({
-            projectId: r.hackathonProjectId,
-            projectTitle: projectMap.get(r.hackathonProjectId) || 'Unknown Project',
-            totalScore: r._sum.rating || 0,
-        }));
+        const projectsData = new Map<string, any>();
+
+        for (const agg of rawAggregations) {
+            const projectId = agg.hackathonProjectId;
+
+            if (!projectsData.has(projectId)) {
+                projectsData.set(projectId, {
+                    projectId: projectId,
+                    projectTitle: projectMap.get(projectId) || 'Unknown Project',
+                    totalScore: 0,
+                    categoryScores: new Map<string, any>(),
+
+                    _totalRatingSum: 0,
+                    _totalRatingCount: 0,
+                });
+            }
+
+            const projectEntry = projectsData.get(projectId)!;
+            const categoryId = agg.categoryId;
+
+            if (!projectEntry.categoryScores.has(categoryId)) {
+                projectEntry.categoryScores.set(categoryId, {
+                    categoryId: categoryId,
+                    categoryName: categoryMap.get(categoryId) || 'Unknown Category',
+                    averageScore: 0,
+                    scoresByVoterType: [],
+
+                    _categoryRatingSum: 0,
+                    _categoryRatingCount: 0,
+                });
+            }
+
+            const categoryEntry = projectEntry.categoryScores.get(categoryId)!;
+
+            const averageScore = agg._avg.rating || 0;
+            const voteCount = agg._count.rating || 0;
+            const ratingSum = agg._sum.rating || 0;
+
+            categoryEntry.scoresByVoterType.push({
+                type: agg.raterType,
+                averageScore: parseFloat(averageScore.toFixed(2)),
+                voteCount: voteCount,
+            });
+
+            categoryEntry._categoryRatingSum += ratingSum;
+            categoryEntry._categoryRatingCount += voteCount;
+            projectEntry._totalRatingSum += ratingSum;
+            projectEntry._totalRatingCount += voteCount;
+        }
+
+        const finalLeaderboard = [];
+
+        for (const projectEntry of projectsData.values()) {
+            const categoryScores = [];
+
+            for (const categoryEntry of projectEntry.categoryScores.values()) {
+
+                categoryEntry.averageScore = categoryEntry._categoryRatingCount > 0
+                    ? parseFloat((categoryEntry._categoryRatingSum / categoryEntry._categoryRatingCount).toFixed(2))
+                    : 0;
+
+                categoryEntry.scoresByVoterType.sort((a: any, b: any) => a.type.localeCompare(b.type));
+
+                delete categoryEntry._categoryRatingSum;
+                delete categoryEntry._categoryRatingCount;
+
+                categoryScores.push(categoryEntry);
+            }
+
+            projectEntry.totalScore = projectEntry._totalRatingCount > 0
+                ? parseFloat((projectEntry._totalRatingSum / projectEntry._totalRatingCount).toFixed(2))
+                : 0;
+
+            categoryScores.sort((a: any, b: any) => a.categoryName.localeCompare(b.categoryName));
+            projectEntry.categoryScores = categoryScores;
+
+            delete projectEntry._totalRatingSum;
+            delete projectEntry._totalRatingCount;
+
+            finalLeaderboard.push(projectEntry);
+        }
+
+        finalLeaderboard.sort((a, b) => b.totalScore - a.totalScore);
+
+        return finalLeaderboard;
     }
-
 
     async findOrCreateThemes(names: string[]): Promise<HackathonThemeCategory[]> {
         const operations = names.map((name) =>
