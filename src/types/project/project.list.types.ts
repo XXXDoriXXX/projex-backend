@@ -87,6 +87,7 @@ export type ProjectSummaryFromRepo = Prisma.ProjectGetPayload<{
 }>;
 export interface ProjectSummaryDto extends ProjectSummaryFromRepo {
     viewsCount: number;
+    likesCount: number;
 }
 export interface GetProjectsQueryDto {
     limit?: number;

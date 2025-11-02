@@ -1,6 +1,6 @@
 import { CreateProjectData } from '../types/project/Project';
 import { prisma } from '../prisma';
-import {Prisma, Project, Technology} from '@prisma/client';
+import {Prisma, Project, ProjectStatus, Technology} from '@prisma/client';
 import { ProjectExists, ProjectWithDetails, ViewsAggregation } from '../types/project/project.types';
 import { CreatedProject } from '../types/project/ProjectCreate';
 import { injectable } from 'tsyringe';
@@ -22,6 +22,7 @@ export interface IProjectRepository {
     updateVisibility(id: string, token: string | null): Promise<Project>;
     getAllTechnologies(): Promise<Technology[]>;
     attachPreviewToProject(projectId: string, mediaId: string): Promise<Project>;
+    updateStatus(id: string, status: ProjectStatus): Promise<Project>;
     findMany(options: GetProjectsQueryDto & { limit: number }): Promise<PaginatedProjectsResponse>;
 }
 type DecodedCursor = { id: string; createdAtTs: number };
@@ -59,35 +60,49 @@ export class ProjectRepository implements IProjectRepository {
             where: { id_userId: { id, userId } },
         });
     }
-    async updateProject(id: string, previewUrlValue: string | null, data: CreateProjectData): Promise<CreatedProject> {
-        const dataWithoutMediaIds = { ...data, mediaIds: undefined };
+    async updateProject(id: string, previewUrlValue: string | null, data: any): Promise<CreatedProject> {
+
+        const updateData: Prisma.ProjectUpdateInput = {
+
+            title: data.title,
+            description: data.description,
+            previewUrl: previewUrlValue,
+            privateLinkToken: data.privateLinkToken,
+        };
+
+        if (data.githubUrl !== undefined) {
+            updateData.githubUrl = data.githubUrl ?? null;
+        }
+        if (data.demoUrl !== undefined) {
+            updateData.demoUrl = data.demoUrl ?? null;
+        }
+
+        if (data.technologies) {
+            updateData.technologies = {
+                set: data.technologies.map((techId: string) => ({ id: techId })),
+            };
+        }
+        if (data.subauthorIds) {
+            updateData.subauthors = {
+                set: data.subauthorIds.map((userId: string) => ({ id: userId })),
+            };
+        }
+
         return prisma.project.update({
             where: { id },
-            data: {
-                userId: data.userId,
-                title: data.title,
-                description: data.description,
-                previewUrl: previewUrlValue,
-                githubUrl: data.githubUrl ?? null,
-                demoUrl: data.demoUrl ?? null,
-                technologies: data.technologies
-                    ? {
-                        set: data.technologies.map((techId) => ({ id: techId })),
-                    }
-                    : undefined,
-                subauthors: data.subauthorIds
-                    ? {
-
-                        set: data.subauthorIds.map((userId) => ({ id: userId })),
-                    }
-                    : undefined,
-            },
+            data: updateData,
             include: {
                 user: true,
                 media: true,
                 technologies: true,
                 subauthors: true,
             },
+        });
+    }
+    async updateStatus(id: string, status: ProjectStatus): Promise<Project> {
+        return prisma.project.update({
+            where: { id },
+            data: { status: status },
         });
     }
     async createProject(data: CreateProjectData): Promise<CreatedProject> {
@@ -192,8 +207,8 @@ export class ProjectRepository implements IProjectRepository {
         const isDesc = sortOrder === 'desc';
 
         const whereConditions: Prisma.ProjectWhereInput[] = [
-
             { privateLinkToken: null },
+            { status: ProjectStatus.PUBLISHED },
         ];
 
         if (search) {

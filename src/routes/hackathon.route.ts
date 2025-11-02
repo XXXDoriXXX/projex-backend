@@ -14,6 +14,7 @@ router.put('/:id', authenticate, hackathonController.updateHackathon);
 router.delete('/:id', authenticate, hackathonController.deleteHackathon);
 router.get('/', hackathonController.getAllHackathons);
 router.get('/:id', hackathonController.getHackathonById);
+router.patch('/:id/status', authenticate, hackathonController.updateHackathonStatus);
 router.post('/:id/join', authenticate, hackathonController.joinHackathon);
 router.delete('/:id/leave', authenticate, hackathonController.leaveHackathon);
 router.post('/:id/submit', authenticate, hackathonController.submitProject);

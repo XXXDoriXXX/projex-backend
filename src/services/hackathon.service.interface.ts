@@ -18,6 +18,7 @@ import {
 
 export interface IHackathonService {
     createHackathon(authorId: string, dto: CreateHackathonDto): Promise<Hackathon>;
+    updateHackathonStatus(hackathonId: string,userid:string, status: HackathonStatus): Promise<Hackathon>;
     updateHackathon(hackathonId: string, userId: string, dto: UpdateHackathonDto): Promise<Hackathon>;
     deleteHackathon(hackathonId: string, userId: string): Promise<void>;
     getHackathonById(hackathonId: string): Promise<HackathonWithDetails>;

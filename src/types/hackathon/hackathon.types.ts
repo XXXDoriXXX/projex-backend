@@ -10,7 +10,7 @@ import {
     Project,
     Prisma,
     HackathonStatus,
-    HackathonRaterType, ProjectStatus,
+    HackathonRaterType, ProjectStatus, Technology,
 } from '@prisma/client';
 
 export interface CreateHackathonDto {
@@ -37,7 +37,7 @@ export interface HackathonProjectSummary {
     status: ProjectStatus;
     likesCount: number;
     viewsCount: number;
-    technologies: string[];
+    technologies: Technology[];
     createdAt: Date;
 }
 export type UpdateHackathonDto = Partial<CreateHackathonDto>;

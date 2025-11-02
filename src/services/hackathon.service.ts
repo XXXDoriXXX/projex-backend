@@ -69,6 +69,16 @@ export class HackathonService implements IHackathonService {
         }
     }
 
+
+    async updateHackathonStatus(hackathonId: string, userid:string, newStatus: HackathonStatus): Promise<Hackathon> {
+        const hackathon = await this.getHackathonAndCheckOwnership(hackathonId, userid);
+        try {
+            return await this.hackathonRepo.update(hackathonId, { status: newStatus });
+        } catch (err: any) {
+            throw new DatabaseError(`Failed to update hackathon status: ${err.message}`);
+        }
+    }
+
     async updateHackathon(hackathonId: string, userId: string, dto: UpdateHackathonDto): Promise<Hackathon> {
         const hackathon = await this.getHackathonAndCheckOwnership(hackathonId, userId);
 
@@ -165,7 +175,7 @@ export class HackathonService implements IHackathonService {
                 status: project.status,
                 likesCount: likesCount,
                 viewsCount: viewsCount,
-                technologies: technologyNames,
+                technologies: project.technologies,
                 createdAt: project.createdAt,
             });
         }

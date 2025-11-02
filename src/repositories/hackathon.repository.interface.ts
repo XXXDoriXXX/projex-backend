@@ -56,5 +56,7 @@ export interface IHackathonRepository {
     getThemeCategories(): Promise<HackathonThemeCategory[]>;
     getRatingCategories(): Promise<HackathonRatingCategory[]>;
 
+    updateStatus(hackathonId: string, status: HackathonStatus): Promise<Hackathon>;
+
     findUserProjectsInHackathon(hackathonId: string, userId: string): Promise<HackathonProjectForAggregation[]>;
 }

@@ -30,6 +30,14 @@ export class HackathonController {
         res.status(201).json({ success: true, data: hackathon, message: 'Hackathon created' });
     });
 
+    public updateHackathonStatus = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+       const userId = req.user?.userId;
+       const { id } = req.params;
+         const { status } = req.body;
+         const updatedHackathon = await this.hackathonService.updateHackathonStatus(id, userId!, status);
+         res.status(200).json({ success: true, data: updatedHackathon, message:' Hackathon status updated' });
+    });
+
     public updateHackathon = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
         const userId = req.user?.userId;
         if (!userId) {

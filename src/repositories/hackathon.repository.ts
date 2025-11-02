@@ -11,7 +11,7 @@ import {
     HackathonStatus,
     HackathonThemeCategory,
     Prisma,
-    HackathonRaterType,
+    HackathonRaterType, ProjectStatus, Project,
 } from '@prisma/client';
 import {
     HackathonWithDetails,
@@ -340,7 +340,12 @@ export class HackathonRepository implements IHackathonRepository {
     async getRatingCategories(): Promise<HackathonRatingCategory[]> {
         return prisma.hackathonRatingCategory.findMany({ orderBy: { order: 'asc' } });
     }
-
+    async updateStatus(id: string, status: HackathonStatus): Promise<Hackathon> {
+        return prisma.hackathon.update({
+            where: { id },
+            data: { status: status },
+        });
+    }
     async findUserProjectsInHackathon(hackathonId: string, userId: string): Promise<HackathonProjectForAggregation[]> {
         return prisma.hackathonProject.findMany({
             where: {
