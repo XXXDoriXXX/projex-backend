@@ -34,7 +34,12 @@ function parseAllowedOrigins(envValue?: string): string[] {
         });
 }
 
-const defaultOrigins = ['http://localhost:3000', 'http://localhost:5173, https://projex-frontend-hazel.vercel.app'];
+const defaultOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://projex-frontend-hazel.vercel.app'
+];
+
 
 const envOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
 
