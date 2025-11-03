@@ -5,23 +5,26 @@ import { ProjectMedia, MediaType } from '@prisma/client';
 import { type IProjectMediaRepository } from '../repositories/project.media.repository';
 import { type IAzureBlobService } from './azure.blob.service';
 import { ValidationError, AppError } from '../errors/CustomErrors';
-import {ForbiddenError, NotFoundError} from "routing-controllers";
-import {fileURLToPath} from "node:url";
+import { ForbiddenError, NotFoundError } from 'routing-controllers';
 import { Readable } from 'stream';
-import ffmpeg from "fluent-ffmpeg";
+import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import ffprobeInstaller from '@ffprobe-installer/ffprobe';
+
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 ffmpeg.setFfprobePath(ffprobeInstaller.path);
+
 export interface IProjectServiceMedia {
-    uploadMedia(userId: string, file: { buffer: Buffer, mimetype: string, originalname: string }): Promise<ProjectMedia>;
+    uploadMedia(userId: string, file: { buffer: Buffer; mimetype: string; originalname: string }): Promise<ProjectMedia>;
     deleteMedia(mediaId: string, userId: string): Promise<void>;
 }
-const MAX_IMAGE_SIZE_MB = 50; // 50 MB для зображень
-const MAX_VIDEO_SIZE_MB = 1024; // 1 GB для відео
-const MAX_VIDEO_DURATION_SEC = 180; // 3 хвилини
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
+const MAX_IMAGE_SIZE_MB = 50; // 50 MB
+const MAX_VIDEO_SIZE_MB = 1024; // 1 GB
+const MAX_VIDEO_DURATION_SEC = 180; // 3 min
+
+const __dirname = path.resolve();
+
 @injectable()
 export class ProjectServiceMedia implements IProjectServiceMedia {
     constructor(
