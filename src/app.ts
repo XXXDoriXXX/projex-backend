@@ -37,7 +37,8 @@ function parseAllowedOrigins(envValue?: string): string[] {
 const defaultOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
-  'https://projex-frontend-hazel.vercel.app'
+  'https://projex-frontend-hazel.vercel.app',
+    'https://www.projex.foo'
 ];
 
 
