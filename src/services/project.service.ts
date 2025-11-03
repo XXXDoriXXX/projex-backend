@@ -243,9 +243,6 @@ export class ProjectService implements IProjectService {
         try {
             updatedProject = await this.repo.updateProject(id, previewUrlValue, projectToUpdate);
         } catch (err: any) {
-            if (err?.code === `P2002`) {
-                throw new ValidationError(`Project with this title already exists`, `title`);
-            }
             throw new DatabaseError(`Failed to update project. ${err.message}`, { id });
         }
 
