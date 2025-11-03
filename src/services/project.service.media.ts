@@ -10,6 +10,7 @@ import { Readable } from 'stream';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import ffprobeInstaller from '@ffprobe-installer/ffprobe';
+import fs from 'fs';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 ffmpeg.setFfprobePath(ffprobeInstaller.path);
@@ -33,8 +34,9 @@ export class ProjectServiceMedia implements IProjectServiceMedia {
 
     private runMediaWorker(fileBuffer: Buffer, mimetype: string): Promise<Buffer> {
         return new Promise((resolve, reject) => {
-            const workerPath = path.resolve(_dirname, '../workers/media.worker.js');
-
+            const prodWorker = path.resolve(__dirname, '../workers/media.worker.js');
+            const devWorker = path.resolve(__dirname, '../../src/workers/media.worker.ts');
+            const workerPath = fs.existsSync(prodWorker) ? prodWorker : devWorker;
             const worker = new Worker(workerPath, {
                 workerData: {
                     fileBuffer,
