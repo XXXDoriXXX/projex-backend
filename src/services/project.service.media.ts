@@ -23,8 +23,7 @@ const MAX_IMAGE_SIZE_MB = 50; // 50 MB
 const MAX_VIDEO_SIZE_MB = 1024; // 1 GB
 const MAX_VIDEO_DURATION_SEC = 180; // 3 min
 
-const __dirname = path.resolve();
-
+const _dirname = path.resolve();
 @injectable()
 export class ProjectServiceMedia implements IProjectServiceMedia {
     constructor(
@@ -34,7 +33,7 @@ export class ProjectServiceMedia implements IProjectServiceMedia {
 
     private runMediaWorker(fileBuffer: Buffer, mimetype: string): Promise<Buffer> {
         return new Promise((resolve, reject) => {
-            const workerPath = path.resolve(__dirname, '../workers/media.worker.ts');
+            const workerPath = path.resolve(_dirname, '../workers/media.worker.ts');
 
             const worker = new Worker(workerPath, {
                 workerData: {
