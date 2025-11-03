@@ -37,4 +37,6 @@ export interface IHackathonService {
     getRatingCategories(): Promise<HackathonRatingCategory[]>;
 
     getUserProjectsInHackathon(hackathonId: string, userId: string): Promise<HackathonProjectSummary[]>;
+    getMyRatingsInHackathon(hackathonId: string, userId: string): Promise<any[]>;
+    getProjectRatings(hpId: string): Promise<any[]>;
 }

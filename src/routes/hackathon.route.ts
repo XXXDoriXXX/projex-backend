@@ -24,4 +24,6 @@ router.get('/:id/leaderboard', hackathonController.getLeaderboard);
 router.get('/categories/themes', hackathonController.getThemeCategories);
 router.get('/categories/ratings', hackathonController.getRatingCategories);
 router.get('/:id/my-projects', authenticate, hackathonController.getMyProjects);
+router.get('/:id/my-ratings', authenticate, hackathonController.getMyRatingsInHackathon);
+router.get('/project/:hpId/ratings', hackathonController.getProjectRatings);
 export default router;

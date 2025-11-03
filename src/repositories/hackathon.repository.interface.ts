@@ -59,4 +59,14 @@ export interface IHackathonRepository {
     updateStatus(hackathonId: string, status: HackathonStatus): Promise<Hackathon>;
 
     findUserProjectsInHackathon(hackathonId: string, userId: string): Promise<HackathonProjectForAggregation[]>;
+    findUserRatingsInHackathon(hackathonId: string, userId: string): Promise<(HackathonProjectRating & {
+        category: HackathonRatingCategory;
+        project: (HackathonProject & {
+            project: { id: string; title: string; };
+        });
+    })[]>;
+    findRatingsForProject(hpId: string): Promise<(HackathonProjectRating & {
+        category: HackathonRatingCategory;
+        rater: { id: string; username: string; avatarUrl: string | null; };
+    })[]>;
 }

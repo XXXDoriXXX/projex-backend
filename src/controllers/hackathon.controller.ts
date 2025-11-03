@@ -193,4 +193,19 @@ export class HackathonController {
         const projects = await this.hackathonService.getUserProjectsInHackathon(id, userId);
         res.status(200).json({ success: true, data: projects });
     });
+    public getMyRatingsInHackathon = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+        const userId = req.user?.userId;
+        if (!userId) {
+            throw new ForbiddenError('Authentication required');
+        }
+        const { id: hackathonId } = req.params;
+
+        const ratings = await this.hackathonService.getMyRatingsInHackathon(hackathonId, userId);
+        res.status(200).json({ success: true, data: ratings });
+    });
+    public getProjectRatings = asyncHandler(async (req: Request, res: Response) => {
+        const { hpId } = req.params;
+        const ratings = await this.hackathonService.getProjectRatings(hpId);
+        res.status(200).json({ success: true, data: ratings });
+    });
 }

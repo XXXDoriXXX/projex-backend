@@ -422,8 +422,6 @@ export class HackathonService implements IHackathonService {
             const { project } = submission;
             const viewsCount = viewsMap.get(project.id) || 0;
 
-            const technologyNames = project.technologies.map((tech) => tech.name);
-
             publicProjects.push({
                 hpId: submission.id,
                 id: project.id,
@@ -436,10 +434,58 @@ export class HackathonService implements IHackathonService {
                 status: project.status,
                 likesCount: project._count.likes,
                 viewsCount: viewsCount,
-                technologies: technologyNames,
+                technologies: project.technologies,
             });
         }
 
         return publicProjects;
+    }
+
+    async getMyRatingsInHackathon(hackathonId: string, userId: string): Promise<any[]> {
+        const hackathon = await this.hackathonRepo.findById(hackathonId);
+        if (!hackathon) {
+            throw new NotFoundError('Hackathon', hackathonId);
+        }
+
+        const ratings = await this.hackathonRepo.findUserRatingsInHackathon(hackathonId, userId);
+
+        return ratings.map(r => ({
+            ratingId: r.id,
+            hackathonProjectId: r.hackathonProjectId,
+            projectId: r.project.project.id,
+            projectTitle: r.project.project.title,
+            categoryId: r.categoryId,
+            categoryName: r.category.name,
+            rating: r.rating,
+            comment: r.comment,
+            raterType: r.raterType,
+            createdAt: r.createdAt
+        }));
+    }
+    async getProjectRatings(hpId: string): Promise<any[]> {
+        const hp = await this.hackathonRepo.findHackathonProjectById(hpId);
+        if (!hp) {
+            throw new NotFoundError('HackathonProject submission', hpId);
+        }
+
+        const ratings = await this.hackathonRepo.findRatingsForProject(hpId);
+
+        return ratings.map(r => ({
+            id: r.id,
+            raterType: r.raterType,
+            rating: r.rating,
+            comment: r.comment,
+            createdAt: r.createdAt,
+            category: {
+                id: r.category.id,
+                name: r.category.name,
+                order: r.category.order
+            },
+            rater: {
+                id: r.rater.id,
+                username: r.rater.username,
+                avatarUrl: r.rater.avatarUrl
+            }
+        }));
     }
 }
