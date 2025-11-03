@@ -1,7 +1,7 @@
 import { prisma } from '../prisma';
 import { Prisma, SocialMedia, User } from '@prisma/client';
 import { injectable } from 'tsyringe';
-import { PublicProject } from '../services/user.service';
+import {PublicProject, RawUserWithProjects} from '../services/user.service';
 
 
 
@@ -9,7 +9,7 @@ import { PublicProject } from '../services/user.service';
 export type UserWithProfile = User & {
     projects: PublicProject[];
     socialLinks: SocialMedia[];
-    _count: {
+    _count?: {
         followers: number;
         following: number;
         projects: number;
@@ -17,14 +17,14 @@ export type UserWithProfile = User & {
 };
 
 export interface IUserRepository {
-    findByUsername(username: string): Promise<UserWithProfile | null>;
+    findByUsername(username: string): Promise<RawUserWithProjects | null>;
     updateUser(id: string, data: Prisma.UserUpdateInput): Promise<User>;
-    findByUsernameAuthor(username: string): Promise<UserWithProfile | null>;
+    findByUsernameAuthor(username: string): Promise<RawUserWithProjects | null>;
 }
 
 @injectable()
 export class UserRepository implements IUserRepository {
-    async findByUsername(username: string): Promise<UserWithProfile | null> {
+    async findByUsername(username: string): Promise<RawUserWithProjects | null> {
         return prisma.user.findUnique({
             where: { username },
             include: {
@@ -40,6 +40,7 @@ export class UserRepository implements IUserRepository {
                         githubUrl: true,
                         demoUrl: true,
                         createdAt: true,
+                        status: true,
                         technologies: true,
                         _count: {
                             select: {
@@ -59,7 +60,7 @@ export class UserRepository implements IUserRepository {
             },
         });
     }
-    async findByUsernameAuthor(username: string): Promise<UserWithProfile | null> {
+    async findByUsernameAuthor(username: string): Promise<RawUserWithProjects | null> {
         return prisma.user.findUnique({
             where: { username },
             include: {
