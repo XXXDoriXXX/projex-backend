@@ -84,6 +84,7 @@ export class HackathonRepository implements IHackathonRepository {
         return prisma.hackathon.findUnique({
             where: { id: hackathonId },
             include: hackathonDetailsInclude,
+
         });
     }
 
@@ -153,6 +154,9 @@ export class HackathonRepository implements IHackathonRepository {
                 AND: whereConditions,
             },
             orderBy: orderBy as any,
+            include: {
+                author: safeUserSelect
+            }
         });
 
         let nextCursor: string | null = null;
@@ -308,7 +312,7 @@ export class HackathonRepository implements IHackathonRepository {
         });
 
         if (rawAggregations.length === 0) {
-            return []; // Немає оцінок
+            return [];
         }
 
         const projectIds = [...new Set(rawAggregations.map((r) => r.hackathonProjectId))];
