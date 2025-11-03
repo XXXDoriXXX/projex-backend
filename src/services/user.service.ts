@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { inject, injectable } from 'tsyringe';
 import { type IUserRepository } from '../repositories/user.repository';
 import { NotFoundError } from '../errors/CustomErrors';
-import {Project, SocialMedia} from "@prisma/client";
+import {Project, ProjectStatus, SocialMedia, Technology, User} from "@prisma/client";
 import {type IProjectRepository} from "../repositories/project.repository";
 export interface PublicProject {
     id: string;
@@ -12,12 +12,30 @@ export interface PublicProject {
     githubUrl: string | null;
     demoUrl: string | null;
     status: string;
-    _count: {
-        likes: number
-    };
-    viewsCount: number;
-    technologies?: string[];
+    likesCount?: number;
+    viewsCount?: number;
+    technologies?: Technology[];
     createdAt: Date;
+}
+export interface RawUserWithProjects extends User {
+    projects: {
+        id: string;
+        title: string;
+        description: string;
+        previewUrl: string | null;
+        githubUrl: string | null;
+        demoUrl: string | null;
+        createdAt: Date;
+        status: ProjectStatus;
+        technologies: { id: string; name: string }[];
+        _count: { likes: number };
+    }[];
+    socialLinks: SocialMedia[];
+    _count?: {
+        followers: number;
+        following: number;
+        projects: number;
+    };
 }
 export interface IUserProfile {
     id: string;
@@ -115,9 +133,9 @@ export class UserService implements IUserService {
             email: publicData.email,
             projects: publicProjects,
             socialLinks: publicData.socialLinks,
-            followersCount: publicData._count.followers,
-            followingCount: publicData._count.following,
-            projectsCount: publicData._count.projects,
+            followersCount: publicData._count?.followers ?? 0,
+            followingCount: publicData._count?.following ?? 0,
+            projectsCount: publicData._count?.projects ?? 0,
             createdAt: publicData.createdAt,
         };
     }

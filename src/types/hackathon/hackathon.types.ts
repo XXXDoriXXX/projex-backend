@@ -185,7 +185,13 @@ export interface GetHackathonsQueryDto {
     themeIds?: string[];
 }
 export interface PaginatedHackathonsResponse {
-    data: HackathonProjectWithDetails[];
+    data: (Hackathon & {
+        author: {
+            id: string;
+            username: string;
+            avatarUrl: string | null;
+        };
+    })[];
     nextCursor: string | null;
 }
 export interface AggregatedLeaderboardData {
