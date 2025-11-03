@@ -14,7 +14,7 @@ import {
     HackathonWithDetails,
     HackathonProjectWithDetails,
     LeaderboardEntry,
-    RateProjectDto,
+    RateProjectDto, HackathonProjectForAggregation, HackathonWithDetailsFromRepo, PaginatedHackathonsResponse,
 } from '../types/hackathon/hackathon.types';
 
 export interface IHackathonRepository {
@@ -22,9 +22,15 @@ export interface IHackathonRepository {
     update(hackathonId: string, data: Prisma.HackathonUpdateInput): Promise<Hackathon>;
     delete(hackathonId: string, authorId: string): Promise<void>;
     deleteById(hackathonId: string): Promise<void>
-    findById(hackathonId: string): Promise<HackathonWithDetails | null>;
-    findMany(status?: HackathonStatus): Promise<Hackathon[]>;
-
+    findById(hackathonId: string): Promise<HackathonWithDetailsFromRepo | null>;
+    findMany(options: {
+        status?: HackathonStatus | 'ALL';
+        limit: number;
+        cursor?: string;
+        sortOrder: 'asc' | 'desc';
+        search?: string;
+        themeIds?: string[];
+    }): Promise<PaginatedHackathonsResponse>;
     findParticipant(hackathonId: string, userId: string): Promise<HackathonParticipant | null>;
     addParticipant(hackathonId: string, userId: string): Promise<HackathonParticipant>;
     removeParticipant(participantId: string): Promise<void>;
@@ -49,4 +55,18 @@ export interface IHackathonRepository {
 
     getThemeCategories(): Promise<HackathonThemeCategory[]>;
     getRatingCategories(): Promise<HackathonRatingCategory[]>;
+
+    updateStatus(hackathonId: string, status: HackathonStatus): Promise<Hackathon>;
+
+    findUserProjectsInHackathon(hackathonId: string, userId: string): Promise<HackathonProjectForAggregation[]>;
+    findUserRatingsInHackathon(hackathonId: string, userId: string): Promise<(HackathonProjectRating & {
+        category: HackathonRatingCategory;
+        project: (HackathonProject & {
+            project: { id: string; title: string; };
+        });
+    })[]>;
+    findRatingsForProject(hpId: string): Promise<(HackathonProjectRating & {
+        category: HackathonRatingCategory;
+        rater: { id: string; username: string; avatarUrl: string | null; };
+    })[]>;
 }

@@ -14,6 +14,7 @@ router.put('/:id', authenticate, hackathonController.updateHackathon);
 router.delete('/:id', authenticate, hackathonController.deleteHackathon);
 router.get('/', hackathonController.getAllHackathons);
 router.get('/:id', hackathonController.getHackathonById);
+router.patch('/:id/status', authenticate, hackathonController.updateHackathonStatus);
 router.post('/:id/join', authenticate, hackathonController.joinHackathon);
 router.delete('/:id/leave', authenticate, hackathonController.leaveHackathon);
 router.post('/:id/submit', authenticate, hackathonController.submitProject);
@@ -22,5 +23,7 @@ router.post('/project/:hpId/rate', authenticate, hackathonController.rateProject
 router.get('/:id/leaderboard', hackathonController.getLeaderboard);
 router.get('/categories/themes', hackathonController.getThemeCategories);
 router.get('/categories/ratings', hackathonController.getRatingCategories);
-
+router.get('/:id/my-projects', authenticate, hackathonController.getMyProjects);
+router.get('/:id/my-ratings', authenticate, hackathonController.getMyRatingsInHackathon);
+router.get('/project/:hpId/ratings', hackathonController.getProjectRatings);
 export default router;

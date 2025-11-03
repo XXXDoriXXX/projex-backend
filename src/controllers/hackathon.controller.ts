@@ -6,7 +6,12 @@ import { inject, injectable } from 'tsyringe';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { type IHackathonService } from '../services/hackathon.service.interface';
-import { CreateHackathonDto, RateProjectDto, UpdateHackathonDto } from '../types/hackathon/hackathon.types';
+import {
+    CreateHackathonDto,
+    GetHackathonsQueryDto,
+    RateProjectDto,
+    UpdateHackathonDto
+} from '../types/hackathon/hackathon.types';
 import { ValidationError, ForbiddenError } from '../errors/CustomErrors';
 import { HackathonStatus } from '@prisma/client';
 
@@ -23,6 +28,14 @@ export class HackathonController {
         const dto: CreateHackathonDto = req.body;
         const hackathon = await this.hackathonService.createHackathon(userId, dto);
         res.status(201).json({ success: true, data: hackathon, message: 'Hackathon created' });
+    });
+
+    public updateHackathonStatus = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+       const userId = req.user?.userId;
+       const { id } = req.params;
+         const { status } = req.body;
+         const updatedHackathon = await this.hackathonService.updateHackathonStatus(id, userId!, status);
+         res.status(200).json({ success: true, data: updatedHackathon, message:' Hackathon status updated' });
     });
 
     public updateHackathon = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -53,14 +66,43 @@ export class HackathonController {
     });
 
     public getAllHackathons = asyncHandler(async (req: Request, res: Response) => {
-        const status = req.query.status as HackathonStatus | undefined;
-        if (status && !Object.values(HackathonStatus).includes(status)) {
-            throw new ValidationError('Invalid status filter', 'status');
-        }
-        const hackathons = await this.hackathonService.getAllHackathons(status);
-        res.status(200).json({ success: true, data: hackathons });
-    });
 
+        const { status, limit, cursor, sortOrder, search, themes } = req.query;
+        let validatedStatus: HackathonStatus | 'ALL' | undefined;
+
+        if (status) {
+            if (status === 'ALL') {
+                validatedStatus = 'ALL';
+            } else if (Object.values(HackathonStatus).includes(status as HackathonStatus)) {
+                validatedStatus = status as HackathonStatus;
+            } else {
+                throw new ValidationError('Invalid status filter', 'status');
+            }
+        }
+
+        if (sortOrder && !['asc', 'desc'].includes(sortOrder as string)) {
+            throw new ValidationError("Invalid sortOrder. Must be 'asc' or 'desc'", 'sortOrder');
+        }
+
+        const themeIds = (themes as string | undefined)?.split(',').filter(id => id.length > 0);
+
+        const queryDto: GetHackathonsQueryDto = {
+            status: validatedStatus as HackathonStatus |"ALL"| undefined,
+            limit: limit ? parseInt(limit as string, 10) : undefined,
+            cursor: cursor as string | undefined,
+            sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+            search: search as string | undefined,
+            themeIds: themeIds,
+        };
+
+        if (limit && (isNaN(queryDto.limit!) || queryDto.limit! < 1)) {
+            throw new ValidationError('Invalid limit. Must be a positive number', 'limit');
+        }
+
+        const result = await this.hackathonService.getAllHackathons(queryDto);
+
+        res.status(200).json({ success: true, ...result });
+    });
 
     public joinHackathon = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
         const userId = req.user?.userId;
@@ -102,7 +144,7 @@ export class HackathonController {
         if (!userId) {
             throw new ForbiddenError('Authentication required');
         }
-        const { hpId } = req.params; // HackathonProject ID
+        const { hpId } = req.params;
         await this.hackathonService.removeProject(hpId, userId);
         res.status(200).json({ success: true, message: 'Project submission removed' });
     });
@@ -123,9 +165,8 @@ export class HackathonController {
 
     public getLeaderboard = asyncHandler(async (req: Request, res: Response) => {
         const { id } = req.params;
-        const raterType = req.query.type as string | undefined;
 
-        const leaderboard = await this.hackathonService.getLeaderboard(id, raterType);
+        const leaderboard = await this.hackathonService.getLeaderboard(id);
         res.status(200).json({ success: true, data: leaderboard });
     });
 
@@ -139,5 +180,32 @@ export class HackathonController {
     public getRatingCategories = asyncHandler(async (req: Request, res: Response) => {
         const categories = await this.hackathonService.getRatingCategories();
         res.status(200).json({ success: true, data: categories });
+    });
+
+    public getMyProjects = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+        const userId = req.user?.userId;
+        if (!userId) {
+            throw new ForbiddenError('Authentication required');
+        }
+
+        const { id } = req.params;
+
+        const projects = await this.hackathonService.getUserProjectsInHackathon(id, userId);
+        res.status(200).json({ success: true, data: projects });
+    });
+    public getMyRatingsInHackathon = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+        const userId = req.user?.userId;
+        if (!userId) {
+            throw new ForbiddenError('Authentication required');
+        }
+        const { id: hackathonId } = req.params;
+
+        const ratings = await this.hackathonService.getMyRatingsInHackathon(hackathonId, userId);
+        res.status(200).json({ success: true, data: ratings });
+    });
+    public getProjectRatings = asyncHandler(async (req: Request, res: Response) => {
+        const { hpId } = req.params;
+        const ratings = await this.hackathonService.getProjectRatings(hpId);
+        res.status(200).json({ success: true, data: ratings });
     });
 }

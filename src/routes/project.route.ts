@@ -10,7 +10,10 @@ import multer from "multer";
 const projectController = container.resolve(ProjectController);
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
+
+router.get('/', projectController.getAllProjects);
 router.post('/create', validateProject, authenticate, projectController.createProject);
+router.patch('/:id/status', authenticate, projectController.updateProjectStatus);
 router.get('/user/:id', projectController.getUserProjects);
 router.delete('/:id', authenticate, projectController.deleteProject);
 router.put('/:id', validateProject, authenticate, projectController.updateProject);

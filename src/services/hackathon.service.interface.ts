@@ -13,15 +13,16 @@ import {
     UpdateHackathonDto,
     RateProjectDto,
     HackathonWithDetails,
-    LeaderboardEntry,
+    LeaderboardEntry, PaginatedHackathonsResponse, GetHackathonsQueryDto, HackathonProjectSummary,
 } from '../types/hackathon/hackathon.types';
 
 export interface IHackathonService {
     createHackathon(authorId: string, dto: CreateHackathonDto): Promise<Hackathon>;
+    updateHackathonStatus(hackathonId: string,userid:string, status: HackathonStatus): Promise<Hackathon>;
     updateHackathon(hackathonId: string, userId: string, dto: UpdateHackathonDto): Promise<Hackathon>;
     deleteHackathon(hackathonId: string, userId: string): Promise<void>;
     getHackathonById(hackathonId: string): Promise<HackathonWithDetails>;
-    getAllHackathons(status?: HackathonStatus): Promise<Hackathon[]>;
+    getAllHackathons(query: GetHackathonsQueryDto): Promise<PaginatedHackathonsResponse>;
 
     joinHackathon(hackathonId: string, userId: string): Promise<HackathonParticipant>;
     leaveHackathon(hackathonId: string, userId: string): Promise<void>;
@@ -34,4 +35,8 @@ export interface IHackathonService {
 
     getThemeCategories(): Promise<HackathonThemeCategory[]>;
     getRatingCategories(): Promise<HackathonRatingCategory[]>;
+
+    getUserProjectsInHackathon(hackathonId: string, userId: string): Promise<HackathonProjectSummary[]>;
+    getMyRatingsInHackathon(hackathonId: string, userId: string): Promise<any[]>;
+    getProjectRatings(hpId: string): Promise<any[]>;
 }

@@ -69,5 +69,5 @@ export const projectFieldValid = async (data: CreateProjectData) => {
     const existing = await prisma.project.findFirst({
         where: { userId: data.userId, title: data.title },
     });
-    if (existing) throw new ValidationError('Project title must be unique per user');
+   // if (existing) throw new ValidationError('Project title must be unique per user');
 };

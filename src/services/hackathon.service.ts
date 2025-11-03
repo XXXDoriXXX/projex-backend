@@ -9,7 +9,7 @@ import {
     UpdateHackathonDto,
     RateProjectDto,
     HackathonWithDetails,
-    LeaderboardEntry,
+    LeaderboardEntry, HackathonProjectSummary, GetHackathonsQueryDto, PaginatedHackathonsResponse,
 } from '../types/hackathon/hackathon.types';
 import {
     Hackathon,
@@ -23,7 +23,7 @@ import {
     HackathonRaterType,
 } from '@prisma/client';
 import { DatabaseError, ForbiddenError, NotFoundError, ValidationError } from '../errors/CustomErrors';
-import { type IProjectRepository } from '../repositories/project.repository'; // Потрібен для перевірки прав на проект
+import { type IProjectRepository } from '../repositories/project.repository';
 
 @injectable()
 export class HackathonService implements IHackathonService {
@@ -35,7 +35,7 @@ export class HackathonService implements IHackathonService {
 
     async createHackathon(authorId: string, dto: CreateHackathonDto): Promise<Hackathon> {
         this.validateHackathonDates(dto.startDate, dto.endDate);
-
+        this.validateHackathonTitleAndDescription(dto.title, dto.description);
         const data: Prisma.HackathonCreateInput = {
             title: dto.title,
             description: dto.description,
@@ -60,13 +60,22 @@ export class HackathonService implements IHackathonService {
             data.ratingCategories = ratingCategories
                 ? { connect: ratingCategories.map((rc) => ({ id: rc.id })) }
                 : undefined;
-
             return await this.hackathonRepo.create(data);
         } catch (err: any) {
             if (err.code === 'P2002') {
                 throw new ValidationError('Hackathon with this title already exists', 'title');
             }
             throw new DatabaseError(`Failed to create hackathon: ${err.message}`);
+        }
+    }
+
+
+    async updateHackathonStatus(hackathonId: string, userid:string, newStatus: HackathonStatus): Promise<Hackathon> {
+        const hackathon = await this.getHackathonAndCheckOwnership(hackathonId, userid);
+        try {
+            return await this.hackathonRepo.update(hackathonId, { status: newStatus });
+        } catch (err: any) {
+            throw new DatabaseError(`Failed to update hackathon status: ${err.message}`);
         }
     }
 
@@ -79,6 +88,7 @@ export class HackathonService implements IHackathonService {
                 dto.endDate || hackathon.endDate.toISOString(),
             );
         }
+        this.validateHackathonTitleAndDescription(dto.title, dto.description);
 
         const data: Prisma.HackathonUpdateInput = {
             title: dto.title,
@@ -135,17 +145,64 @@ export class HackathonService implements IHackathonService {
     }
 
     async getHackathonById(hackathonId: string): Promise<HackathonWithDetails> {
-        const hackathon = await this.hackathonRepo.findById(hackathonId);
-        if (!hackathon) {
+        const hackathonFromRepo = await this.hackathonRepo.findById(hackathonId);
+        if (!hackathonFromRepo) {
             throw new NotFoundError('Hackathon', hackathonId);
         }
-        return hackathon;
-    }
 
-    async getAllHackathons(status?: HackathonStatus): Promise<Hackathon[]> {
-        return this.hackathonRepo.findMany(status);
-    }
+        const projectSummaries: HackathonProjectSummary[] = [];
 
+        const validSubmissions = hackathonFromRepo.projects.filter((submission) => submission.project);
+        const projectIds = validSubmissions.map((submission) => submission.project.id);
+
+        const viewsMap = await this.projectRepo.getViewsCounts(projectIds);
+        for (const submission of hackathonFromRepo.projects) {
+            const { project } = submission;
+            if (!project) continue;
+
+            const technologyNames = project.technologies.map((tech: any) => tech.name);
+            const likesCount = project._count?.likes || 0;
+            const viewsCount = viewsMap.get(project.id) || 0;
+
+            projectSummaries.push({
+                hpId: submission.id,
+                id: project.id,
+                title: project.title,
+                description: project.description,
+                previewUrl: project.previewUrl,
+                githubUrl: project.githubUrl,
+                demoUrl: project.demoUrl,
+                status: project.status,
+                likesCount: likesCount,
+                viewsCount: viewsCount,
+                technologies: project.technologies,
+                createdAt: project.createdAt,
+            });
+        }
+
+        const result: HackathonWithDetails = {
+            ...hackathonFromRepo,
+            projects: projectSummaries,
+        };
+
+        return result;
+    }
+    async getAllHackathons(query: GetHackathonsQueryDto): Promise<PaginatedHackathonsResponse> {
+        const { status, cursor, search, themeIds } = query;
+
+
+        const limit = query.limit ? Math.min(query.limit, 50) : 20;
+        const sortOrder = query.sortOrder || 'desc';
+
+        return this.hackathonRepo.findMany({
+            status,
+            limit,
+            cursor,
+            sortOrder,
+            search,
+            themeIds,
+        });
+    }
 
 
     async joinHackathon(hackathonId: string, userId: string): Promise<HackathonParticipant> {
@@ -186,8 +243,7 @@ export class HackathonService implements IHackathonService {
             throw new NotFoundError('Project', projectId);
         }
         const isAuthor = project.userId === userId;
-        // (Припускаємо, що isProjectExists повертає subauthors, якщо ні - треба змінити логіку)
-        // const isSubauthor = project.subauthors?.some(sa => sa.id === userId);
+
         if (!isAuthor /* && !isSubauthor */) {
             throw new ForbiddenError('You must be the author of the project to submit it.');
         }
@@ -230,7 +286,9 @@ export class HackathonService implements IHackathonService {
 
         const hackathon = hp.hackathon;
         const project = hp.project;
-
+        if(hackathon.status !== 'RATING'){
+            throw new ForbiddenError('Project rating is not allowed at this stage.');
+        }
 
         let raterType: HackathonRaterType;
         const isJudge = hackathon.authorId === raterId || hackathon.judges.some((j) => j.id === raterId);
@@ -261,22 +319,14 @@ export class HackathonService implements IHackathonService {
         return this.hackathonRepo.rateProject(hpId, raterId, raterType, { categoryId, rating, comment });
     }
 
-    async getLeaderboard(hackathonId: string, raterType?: string): Promise<LeaderboardEntry[]> {
+    async getLeaderboard(hackathonId: string): Promise<any[]> {
 
         const hackathon = await this.hackathonRepo.findById(hackathonId);
         if (!hackathon) {
             throw new NotFoundError('Hackathon', hackathonId);
         }
 
-        let validRaterType: HackathonRaterType | undefined;
-        if (raterType) {
-            if (!Object.values(HackathonRaterType).includes(raterType as HackathonRaterType)) {
-                throw new ValidationError('Invalid rater type specified', 'type');
-            }
-            validRaterType = raterType as HackathonRaterType;
-        }
-
-        return this.hackathonRepo.getLeaderboard(hackathonId, validRaterType);
+        return this.hackathonRepo.getLeaderboard(hackathonId);
     }
 
 
@@ -301,7 +351,17 @@ export class HackathonService implements IHackathonService {
             throw new ValidationError('End date must be after start date', 'endDate');
         }
     }
-
+    private validateHackathonTitleAndDescription(title: string | undefined, description: string | undefined): void {
+        if(!title || !description) {
+            throw new ValidationError('Title and description are required', 'title/description');
+        }
+        if(title.length<3 || title.length>100 || title.trim().length===0 || typeof title !== 'string'){
+            throw new ValidationError('Title must be between 3 and 100 characters', 'title');
+        }
+        if(description.length<10 || description.length>1000 || description.trim().length===0 || typeof description !== 'string'){
+            throw new ValidationError('Description must be between 10 and 1000 characters', 'description');
+        }
+    }
     private async getHackathonAndCheckOwnership(hackathonId: string, userId: string): Promise<Hackathon> {
         const hackathon = await this.hackathonRepo.findById(hackathonId);
         if (!hackathon) {
@@ -328,7 +388,6 @@ export class HackathonService implements IHackathonService {
             allThemes.push(...createdThemes);
         }
         if (themeIds.length > 0) {
-            // (В ідеалі, тут має бути перевірка, чи ці ID існують)
             allThemes.push(...themeIds.map(id => ({ id } as HackathonThemeCategory)));
         }
 
@@ -338,7 +397,6 @@ export class HackathonService implements IHackathonService {
             allRatingCategories.push(...createdCats);
         }
         if (ratingCategoryIds.length > 0) {
-            // (Так само, потрібна перевірка ID)
             allRatingCategories.push(...ratingCategoryIds.map(id => ({ id } as HackathonRatingCategory)));
         }
 
@@ -346,5 +404,88 @@ export class HackathonService implements IHackathonService {
             allThemes.length > 0 ? allThemes : undefined,
             allRatingCategories.length > 0 ? allRatingCategories : undefined
         ];
+    }
+    async getUserProjectsInHackathon(hackathonId: string, userId: string): Promise<HackathonProjectSummary[]> {
+        const submissions = await this.hackathonRepo.findUserProjectsInHackathon(hackathonId, userId);
+
+        if (!submissions || submissions.length === 0) {
+            return [];
+        }
+
+        const projectIds = submissions.map(submission => submission.project.id);
+
+        const viewsMap = await this.projectRepo.getViewsCounts(projectIds);
+
+        const publicProjects: HackathonProjectSummary[] = [];
+
+        for (const submission of submissions) {
+            const { project } = submission;
+            const viewsCount = viewsMap.get(project.id) || 0;
+
+            publicProjects.push({
+                hpId: submission.id,
+                id: project.id,
+                title: project.title,
+                description: project.description,
+                previewUrl: project.previewUrl,
+                githubUrl: project.githubUrl,
+                demoUrl: project.demoUrl,
+                createdAt: project.createdAt,
+                status: project.status,
+                likesCount: project._count.likes,
+                viewsCount: viewsCount,
+                technologies: project.technologies,
+            });
+        }
+
+        return publicProjects;
+    }
+
+    async getMyRatingsInHackathon(hackathonId: string, userId: string): Promise<any[]> {
+        const hackathon = await this.hackathonRepo.findById(hackathonId);
+        if (!hackathon) {
+            throw new NotFoundError('Hackathon', hackathonId);
+        }
+
+        const ratings = await this.hackathonRepo.findUserRatingsInHackathon(hackathonId, userId);
+
+        return ratings.map(r => ({
+            ratingId: r.id,
+            hackathonProjectId: r.hackathonProjectId,
+            projectId: r.project.project.id,
+            projectTitle: r.project.project.title,
+            categoryId: r.categoryId,
+            categoryName: r.category.name,
+            rating: r.rating,
+            comment: r.comment,
+            raterType: r.raterType,
+            createdAt: r.createdAt
+        }));
+    }
+    async getProjectRatings(hpId: string): Promise<any[]> {
+        const hp = await this.hackathonRepo.findHackathonProjectById(hpId);
+        if (!hp) {
+            throw new NotFoundError('HackathonProject submission', hpId);
+        }
+
+        const ratings = await this.hackathonRepo.findRatingsForProject(hpId);
+
+        return ratings.map(r => ({
+            id: r.id,
+            raterType: r.raterType,
+            rating: r.rating,
+            comment: r.comment,
+            createdAt: r.createdAt,
+            category: {
+                id: r.category.id,
+                name: r.category.name,
+                order: r.category.order
+            },
+            rater: {
+                id: r.rater.id,
+                username: r.rater.username,
+                avatarUrl: r.rater.avatarUrl
+            }
+        }));
     }
 }
