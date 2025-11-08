@@ -5,7 +5,7 @@ export function ensureAccess(project: any, token?: string, userId?: string): voi
         throw new NotFoundError(`Project`);
     }
 
-    if (project.privateLinkToken === `private`) {
+    if (project.privateLinkToken.startsWith('private:')) {
         if (project.userId !== userId) {
             throw new ForbiddenError(`Access denied: not your project`);
         }
