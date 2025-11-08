@@ -26,7 +26,7 @@ export const projectFieldValid = async (data: CreateProjectData) => {
         throw new ValidationError('Description must be at least 10 characters');
     }
     if (data.description.length > 5000) {
-        throw new ValidationError('Description length exceeds 500 characters');
+        throw new ValidationError('Description length exceeds 5000 characters');
     }
 
     // github

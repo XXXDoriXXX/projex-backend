@@ -357,7 +357,7 @@ export class ProjectService implements IProjectService {
                 return this.setVisibility(id, null);
             }
             case `private`: {
-                return this.setVisibility(id, `private`);
+                return this.setVisibility(id, `private:${id}`);
             }
             default: {
                 throw new ValidationError(`Invalid visibility option`, `visible`);
