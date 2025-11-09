@@ -13,7 +13,12 @@ import {type IProjectMediaRepository} from "../repositories/project.media.reposi
 import {UserInfo} from "./auth.service";
 import type {IProjectMetricsRepository} from "../repositories/project.metrics.repository";
 import {GetProjectsQueryDto, PaginatedProjectsResponse, ProjectSummaryDto} from "../types/project/project.list.types";
-
+import {IEmailProvider} from "../modules/email.provider";
+import {IAuthRepository} from "../repositories/auth.repository";
+type ProjectWithUserAndSubauthorsInfo = Project & {
+    user: UserInfo;
+    subauthors: UserInfo[];
+};
 export interface IProjectService {
     getProjectById(
         id: string,
@@ -42,7 +47,9 @@ export interface IProjectService {
 export class ProjectService implements IProjectService {
     constructor(@inject('IProjectRepository') private repo: IProjectRepository,
                 @inject('IProjectMediaRepository') private mediaRepo: IProjectMediaRepository,
-               @inject('IProjectMetricsRepository') private metricsRepo: IProjectMetricsRepository ) {}
+               @inject('IProjectMetricsRepository') private metricsRepo: IProjectMetricsRepository,
+                @inject('IAuthRepository') private authRepo: IAuthRepository,
+                @inject('IEmailProvider') private emailProvider: IEmailProvider,) {}
 
     async getProjectById(
         id: string,
@@ -186,19 +193,25 @@ export class ProjectService implements IProjectService {
     async updateProject(id: string, data: CreateProjectData): Promise<Project> {
         requireUserIdProjectId(id, data?.userId);
 
-        const project = await this.repo.isProjectExists(id);
-        if (!project) {
+        const projectWithDetails = await this.repo.findById(id);
+
+        if (!projectWithDetails) {
             throw new NotFoundError(`Project`, id);
         }
-
-        if (project.userId !== data.userId) {
+        const currentProject = projectWithDetails as ProjectWithUserAndSubauthorsInfo;
+        if (currentProject.userId !== data.userId) {
             throw new ForbiddenError(`You do not have permission to update this project`);
         }
 
         await projectFieldValid(data);
-        const newMediaIds: string[] = data.mediaIds || [];
 
-        let previewUrlValue: string | null = project.previewUrl;
+        const currentSubauthorIds = projectWithDetails.subauthors.map(sa => sa.id);
+        const newSubauthorIds = data.subauthorIds || [];
+
+        const addedSubauthorIds = newSubauthorIds.filter(id => !currentSubauthorIds.includes(id));
+
+        const newMediaIds: string[] = data.mediaIds || [];
+        let previewUrlValue: string | null = projectWithDetails.previewUrl;
 
         if (data.previewId) {
             const previewMedia = await this.mediaRepo.getMediaById(data.previewId);
@@ -206,7 +219,6 @@ export class ProjectService implements IProjectService {
                 previewUrlValue = previewMedia.url;
             }
         } else if (data.mediaIds && data.mediaIds.length > 0) {
-
             const firstMedia = await this.mediaRepo.getMediaById(newMediaIds[0]);
             if (firstMedia) {
                 previewUrlValue = firstMedia.url;
@@ -224,8 +236,8 @@ export class ProjectService implements IProjectService {
             switch (visible) {
                 case `link`: {
                     projectToUpdate.privateLinkToken =
-                        project.privateLinkToken && project.privateLinkToken !== 'private' && project.privateLinkToken !== null
-                            ? project.privateLinkToken
+                        projectWithDetails.privateLinkToken && projectWithDetails.privateLinkToken !== 'private' && projectWithDetails.privateLinkToken !== null
+                            ? projectWithDetails.privateLinkToken
                             : crypto.randomBytes(24).toString(`hex`);
                     break;
                 }
@@ -234,12 +246,32 @@ export class ProjectService implements IProjectService {
                     break;
                 }
                 case `private`: {
-                    projectToUpdate.privateLinkToken = `private`;
+                    projectToUpdate.privateLinkToken = `private:${id}`;
                     break;
                 }
             }
         }
+
         let updatedProject: Project;
+
+        if (addedSubauthorIds.length > 0) {
+            const newCoauthors = await this.authRepo.getUsersByIds(addedSubauthorIds);
+            const authorUsername = projectWithDetails.user.username;
+            const projectName = projectWithDetails.title;
+
+            newCoauthors.forEach(coauthor => {
+                this.emailProvider.sendCoauthorInvitation(
+                    coauthor.email,
+                    projectName,
+                    authorUsername,
+                    projectWithDetails.id,
+                    coauthor.username
+                ).catch(err => {
+                    console.error(`[ProjectService] Failed to send co-author email to ${coauthor.email} during update:`, err);
+                });
+            });
+        }
+
         try {
             updatedProject = await this.repo.updateProject(id, previewUrlValue, projectToUpdate);
         } catch (err: any) {
@@ -300,7 +332,7 @@ export class ProjectService implements IProjectService {
         const mediaIds: string[] = data.mediaIds || [];
         const previewId: string = data.previewId || '';
         const projectToCreate = { ...data,mediaIds: undefined, previewId:undefined };
-        let newProject: Project;
+        let newProject: Project & { user: User; subauthors: User[] };
         try {
             newProject = await this.repo.createProject(projectToCreate);
         } catch (err: any) {
@@ -308,6 +340,27 @@ export class ProjectService implements IProjectService {
                 throw new ValidationError(`Project with this title already exists`, `title`);
             }
             throw new DatabaseError(`Failed to create project. ${err.message}`);
+        }
+        if (newProject.subauthors && newProject.subauthors.length > 0) {
+            const authorUsername = newProject.user.username;
+            const projectName = newProject.title;
+
+            newProject.subauthors.forEach((coauthor) => {
+                this.emailProvider
+                    .sendCoauthorInvitation(
+                        coauthor.email,
+                        projectName,
+                        authorUsername,
+                        newProject.id,
+                        coauthor.username,
+                    )
+                    .catch((err) => {
+                        console.error(
+                            `[ProjectService] Failed to send co-author email to ${coauthor.email} during creation:`,
+                            err,
+                        );
+                    });
+            });
         }
         if (mediaIds.length > 0) {
             try {

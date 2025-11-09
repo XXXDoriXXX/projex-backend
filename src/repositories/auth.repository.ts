@@ -11,6 +11,7 @@ export interface IAuthRepository {
     addVerificationCode(email: string, code: string): Promise<User>;
     addResetCode(email: string, code: string): Promise<User>;
     getByEmailVerificationToken(token: string): Promise<User | null>;
+    getUsersByIds(ids: string[]): Promise<User[]>;
 }
 @injectable()
 export class AuthRepository implements IAuthRepository {
@@ -52,6 +53,14 @@ export class AuthRepository implements IAuthRepository {
             where: { id },
             include: {
                 projects: true,
+            },
+        });
+    }
+    async getUsersByIds(ids: string[]): Promise<User[]> {
+        return prisma.user.findMany({
+            where: { id: { in: ids } },
+            include: {
+                subauthoredProjects: false,
             },
         });
     }

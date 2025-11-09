@@ -4,4 +4,5 @@ export type CreatedProject = Project & {
     user: User;
     media: ProjectMedia[];
     technologies: Technology[];
+    subauthors: User[];
 };

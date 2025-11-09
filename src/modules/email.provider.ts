@@ -5,6 +5,7 @@ export interface IEmailProvider {
     sendPasswordReset(email: string, code: string, username?: string): Promise<void>;
     sendVerificationConfirmation(email: string, username?: string): Promise<void>;
     sendPasswordChangeConfirmation(email: string, username?: string): Promise<void>;
+    sendCoauthorInvitation(email: string, projectName: string, authorUsername: string,projectId:string, recipientUsername?: string, ): Promise<void>;
 }
 
 @injectable()
@@ -110,6 +111,49 @@ export class ResendEmailProvider implements IEmailProvider {
         </div>
 
         <p style="color:#6b7280;">If you didn’t perform this action, we recommend changing your password again and reviewing your account activity.</p>
+
+        <hr style="margin:32px 0; border:none; border-top:1px solid #e5e7eb;"/>
+        <p style="font-size:13px; color:#9ca3af;">
+          Sent automatically by <span style="color:#3b82f6;">Projex</span><br/>
+          Please do not reply to this email.
+        </p>
+      </div>
+    `,
+        });
+    }
+    async sendCoauthorInvitation(
+        email: string,
+        projectName: string,
+        authorUsername: string,
+        projectId:string,
+        recipientUsername?: string,
+
+    ): Promise<void> {
+        const safeRecipient = recipientUsername ? recipientUsername.replace(/[<>]/g, '') : '';
+        const safeAuthor = authorUsername.replace(/[<>]/g, '');
+        const safeProject = projectName.replace(/[<>]/g, '');
+
+        await this.resend.emails.send({
+            from: 'no-reply@projex.foo',
+            to: email,
+            subject: `You've been added as a co-author to: ${safeProject}`,
+            html: `
+      <div style="font-family: Inter, Roboto, sans-serif; color:#111; line-height:1.6; padding:24px;">
+        <h2 style="margin-bottom:12px;">Co-author invitation${safeRecipient ? `, ${safeRecipient}` : ''} 🎉</h2>
+        <p>
+          <span style="font-weight:600; color:#3b82f6;">${safeAuthor}</span> has added you as a co-author to the project: 
+          <b style="color:#111;">${safeProject}</b>.
+        </p>
+        <p>You now have full editing access to this project on Projex.</p>
+        
+        <div style="margin:24px 0; text-align:center;">
+          <a href="https://projex.foo/project/view/${projectId}"
+             style="background-color:#3b82f6; color:#fff; text-decoration:none; padding:12px 24px; border-radius:8px; font-weight:500; display:inline-block;">
+            View Project Details
+          </a>
+        </div>
+
+        <p>Collaborate efficiently and manage your code smarter!</p>
 
         <hr style="margin:32px 0; border:none; border-top:1px solid #e5e7eb;"/>
         <p style="font-size:13px; color:#9ca3af;">
