@@ -1,5 +1,5 @@
 import { prisma } from '../prisma';
-import { Prisma, SocialMedia, User } from '@prisma/client';
+import {Follow, Prisma, SocialMedia, User} from '@prisma/client';
 import { injectable } from 'tsyringe';
 import {PublicProject, RawUserWithProjects} from '../services/user.service';
 
@@ -23,6 +23,11 @@ export interface IUserRepository {
     addSocialLink(userId: string, platform: string, url: string, handle: string | null): Promise<SocialMedia>;
     removeSocialLink(socialMediaId: string): Promise<SocialMedia>;
     getSocialLinkById(id: string): Promise<SocialMedia | null>;
+    createFollow(followerId: string, followingId: string): Promise<Follow>;
+    deleteFollow(followerId: string, followingId: string): Promise<void>;
+    isFollowing(followerId: string, followingId: string): Promise<boolean>;
+    getFollowers(userId: string): Promise<Follow[]>;
+    getFollowing(userId: string): Promise<Follow[]>;
 }
 
 @injectable()
@@ -131,6 +136,48 @@ export class UserRepository implements IUserRepository {
     async getSocialLinkById(id: string): Promise<SocialMedia | null> {
         return prisma.socialMedia.findUnique({
             where: { id },
+        });
+    }
+    async createFollow(followerId: string, followingId: string): Promise<Follow> {
+        return prisma.follow.create({
+            data: { followerId, followingId },
+        });
+    }
+
+    async deleteFollow(followerId: string, followingId: string): Promise<void> {
+        await prisma.follow.delete({
+            where: {
+                followerId_followingId: {
+                    followerId,
+                    followingId,
+                },
+            },
+        });
+    }
+
+    async isFollowing(followerId: string, followingId: string): Promise<boolean> {
+        const follow = await prisma.follow.findUnique({
+            where: {
+                followerId_followingId: {
+                    followerId,
+                    followingId,
+                },
+            },
+        });
+        return !!follow;
+    }
+
+    async getFollowers(userId: string): Promise<Follow[]> {
+        return prisma.follow.findMany({
+            where: { followingId: userId },
+            include: { follower: { select: { id: true, username: true, avatarUrl: true } } },
+        });
+    }
+
+    async getFollowing(userId: string): Promise<Follow[]> {
+        return prisma.follow.findMany({
+            where: { followerId: userId },
+            include: { following: { select: { id: true, username: true, avatarUrl: true } } },
         });
     }
 }

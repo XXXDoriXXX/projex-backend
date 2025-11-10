@@ -5,6 +5,7 @@ import {type IUserService, SocialLinkPayload, UserUpdatePayload} from '../servic
 import { ValidationError } from '../errors/CustomErrors';
 import {type IAuthService} from "../services/auth.service";
 import {AuthenticatedRequest} from "../middleware/auth";
+import {ForbiddenError} from "routing-controllers";
 
 @injectable()
 export class UserController {
@@ -115,5 +116,57 @@ export class UserController {
         await this.userService.deleteSocialMediaLink(userId, socialMediaId);
 
         res.status(200).json({ success: true, message: 'Social link deleted successfully' });
+    });
+    public followUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+        const followerId = req.user?.userId;
+        const { userId: followingId } = req.params;
+
+        if (!followerId) throw new ForbiddenError('Authentication required');
+        if (!followingId) throw new ValidationError('User ID to follow is required');
+
+        await this.userService.followUser(followerId, followingId);
+
+        res.status(200).json({ success: true, message: 'Successfully followed user' });
+    });
+
+    public unfollowUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+        const followerId = req.user?.userId;
+        const { userId: followingId } = req.params;
+
+        if (!followerId) throw new ForbiddenError('Authentication required');
+        if (!followingId) throw new ValidationError('User ID to unfollow is required');
+
+        await this.userService.unfollowUser(followerId, followingId);
+
+        res.status(200).json({ success: true, message: 'Successfully unfollowed user' });
+    });
+
+    public getFollowers = asyncHandler(async (req: Request, res: Response) => {
+        const { userId } = req.params;
+        if (!userId) throw new ValidationError('User ID is required');
+
+        const followers = await this.userService.getFollowersList(userId);
+
+        res.status(200).json({ success: true, data: followers, message: 'Followers list fetched successfully' });
+    });
+
+    public getFollowing = asyncHandler(async (req: Request, res: Response) => {
+        const { userId } = req.params;
+        if (!userId) throw new ValidationError('User ID is required');
+
+        const following = await this.userService.getFollowingList(userId);
+
+        res.status(200).json({ success: true, data: following, message: 'Following list fetched successfully' });
+    });
+    public isUserFollowed = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+        const followerId = req.user?.userId;
+        const { userId: followingId } = req.params;
+
+        if (!followerId) throw new ForbiddenError('Authentication required');
+        if (!followingId) throw new ValidationError('User ID to check is required');
+
+        const isFollowed = await this.userService.isUserFollowing(followerId, followingId);
+
+        res.status(200).json({ success: true, data: { isFollowed }, message: 'Follow status fetched successfully' });
     });
 }

@@ -18,4 +18,14 @@ router.post('/social', authenticate, userController.addSocialLink);
 router.delete('/social/:socialMediaId', authenticate, userController.deleteSocialLink);
 
 router.post('/avatar', authenticate, upload.single('avatar'), userController.updateUserAvatar);
+
+router.post('/follow/:userId', authenticate, userController.followUser);
+
+router.delete('/follow/:userId', authenticate, userController.unfollowUser);
+
+router.get('/:userId/followers', userController.getFollowers);
+
+router.get('/:userId/following', userController.getFollowing);
+
+router.get('/follow/status/:userId', authenticate, userController.isUserFollowed);
 export default router;

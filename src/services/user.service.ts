@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { inject, injectable } from 'tsyringe';
 import { type IUserRepository } from '../repositories/user.repository';
 import {AppError, ForbiddenError, NotFoundError, ValidationError} from '../errors/CustomErrors';
-import {Prisma, Project, ProjectStatus, SocialMedia, Technology, User} from "@prisma/client";
+import {Follow, Prisma, Project, ProjectStatus, SocialMedia, Technology, User} from "@prisma/client"; // ✨ Додано Follow
 import {type IProjectRepository} from "../repositories/project.repository";
 import sharp from "sharp";
 import type {IAzureBlobService} from "./azure.blob.service";
@@ -21,6 +21,18 @@ export interface PublicProject {
     technologies?: Technology[];
     createdAt: Date;
 }
+export interface SimpleUser {
+    id: string;
+    username: string;
+    avatarUrl?: string | null;
+}
+
+export type FollowWithFollower = Follow & {
+    follower: SimpleUser;
+};
+export type FollowWithFollowing = Follow & {
+    following: SimpleUser;
+};
 
 export interface RawUserWithProjects extends User {
     projects: {
@@ -94,6 +106,11 @@ export interface IUserService {
         userId: string,
         file: { buffer: Buffer; mimetype: string; originalname: string }
     ): Promise<string>;
+    followUser(followerId: string, followingId: string): Promise<void>;
+    unfollowUser(followerId: string, followingId: string): Promise<void>;
+    getFollowersList(userId: string): Promise<SimpleUser[]>;
+    getFollowingList(userId: string): Promise<SimpleUser[]>;
+    isUserFollowing(followerId: string, followingId: string): Promise<boolean>;
 }
 const MAX_AVATAR_SIZE_MB = 5;
 const AVATAR_SIZE_PIXELS = 300;
@@ -102,7 +119,7 @@ export class UserService implements IUserService {
     constructor(
         @inject('IUserRepository') private readonly userRepo: IUserRepository,
         @inject('IProjectRepository') private readonly projectRepo: IProjectRepository,
-       @inject('IAzureBlobService') private azureService: IAzureBlobService,
+        @inject('IAzureBlobService') private azureService: IAzureBlobService,
         @inject('IAuthRepository') private authRepo: IAuthRepository,
     ) {}
 
@@ -257,5 +274,60 @@ export class UserService implements IUserService {
         await this.authRepo.updateUser(userId, { avatarUrl: newUrl });
 
         return newUrl;
+    }
+    async followUser(followerId: string, followingId: string): Promise<void> {
+        if (followerId === followingId) {
+            throw new ValidationError('Cannot follow yourself');
+        }
+
+        const followingUser = await this.authRepo.getUserById(followingId);
+        if (!followingUser) {
+            throw new NotFoundError('User to follow');
+        }
+
+        const isAlreadyFollowing = await this.userRepo.isFollowing(followerId, followingId);
+        if (isAlreadyFollowing) {
+            throw new ValidationError('You are already following this user');
+        }
+
+        await this.userRepo.createFollow(followerId, followingId);
+    }
+
+    async unfollowUser(followerId: string, followingId: string): Promise<void> {
+        if (followerId === followingId) {
+            throw new ValidationError('Cannot unfollow yourself');
+        }
+
+        const isAlreadyFollowing = await this.userRepo.isFollowing(followerId, followingId);
+        if (!isAlreadyFollowing) {
+            throw new ValidationError('You are not following this user');
+        }
+
+        await this.userRepo.deleteFollow(followerId, followingId);
+    }
+
+    async getFollowersList(userId: string): Promise<SimpleUser[]> {
+        const follows = await this.userRepo.getFollowers(userId);
+        const followsWithFollower = follows as FollowWithFollower[];
+
+        return followsWithFollower.map(f => ({
+            id: f.follower.id,
+            username: f.follower.username,
+            avatarUrl: f.follower.avatarUrl,
+        }));
+    }
+
+    async getFollowingList(userId: string): Promise<SimpleUser[]> {
+        const follows = await this.userRepo.getFollowing(userId);
+        const followsWithFollowing = follows as FollowWithFollowing[];
+
+        return followsWithFollowing.map(f => ({
+            id: f.following.id,
+            username: f.following.username,
+            avatarUrl: f.following.avatarUrl,
+        }));
+    }
+    async isUserFollowing(followerId: string, followingId: string): Promise<boolean> {
+        return this.userRepo.isFollowing(followerId, followingId);
     }
 }
