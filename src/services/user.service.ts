@@ -1,9 +1,13 @@
 import 'reflect-metadata';
 import { inject, injectable } from 'tsyringe';
 import { type IUserRepository } from '../repositories/user.repository';
-import { NotFoundError } from '../errors/CustomErrors';
-import {Project, ProjectStatus, SocialMedia, Technology, User} from "@prisma/client";
+import {AppError, ForbiddenError, NotFoundError, ValidationError} from '../errors/CustomErrors';
+import {Follow, Prisma, Project, ProjectStatus, SocialMedia, Technology, User} from "@prisma/client"; // ✨ Додано Follow
 import {type IProjectRepository} from "../repositories/project.repository";
+import sharp from "sharp";
+import type {IAzureBlobService} from "./azure.blob.service";
+import {IAuthRepository} from "../repositories/auth.repository";
+
 export interface PublicProject {
     id: string;
     title: string;
@@ -17,6 +21,19 @@ export interface PublicProject {
     technologies?: Technology[];
     createdAt: Date;
 }
+export interface SimpleUser {
+    id: string;
+    username: string;
+    avatarUrl?: string | null;
+}
+
+export type FollowWithFollower = Follow & {
+    follower: SimpleUser;
+};
+export type FollowWithFollowing = Follow & {
+    following: SimpleUser;
+};
+
 export interface RawUserWithProjects extends User {
     projects: {
         id: string;
@@ -35,8 +52,22 @@ export interface RawUserWithProjects extends User {
         followers: number;
         following: number;
         projects: number;
+        Hackathon: number;
+        HackathonParticipant: number;
+        subauthoredProjects: number;
     };
 }
+export type UserUpdatePayload = {
+    username?: string;
+    bio?: string;
+    avatarUrl?: string;
+};
+
+export type SocialLinkPayload = {
+    platform: string;
+    url: string;
+    handle?: string | null;
+};
 export interface IUserProfile {
     id: string;
     username: string;
@@ -64,14 +95,32 @@ export interface IUserService {
         followingCount: number;
         projectsCount: number;
         createdAt: any
+        authoredHackathonsCount: number;
+        participatedHackathonsCount: number;
+        subauthoredProjectsCount: number;
     }>;
+    updateUserProfile(userId: string, data: UserUpdatePayload): Promise<User>;
+    addSocialMediaLink(userId: string, link: SocialLinkPayload): Promise<SocialMedia>;
+    deleteSocialMediaLink(userId: string, socialMediaId: string): Promise<void>;
+    updateUserAvatar(
+        userId: string,
+        file: { buffer: Buffer; mimetype: string; originalname: string }
+    ): Promise<string>;
+    followUser(followerId: string, followingId: string): Promise<void>;
+    unfollowUser(followerId: string, followingId: string): Promise<void>;
+    getFollowersList(userId: string): Promise<SimpleUser[]>;
+    getFollowingList(userId: string): Promise<SimpleUser[]>;
+    isUserFollowing(followerId: string, followingId: string): Promise<boolean>;
 }
-
+const MAX_AVATAR_SIZE_MB = 5;
+const AVATAR_SIZE_PIXELS = 300;
 @injectable()
 export class UserService implements IUserService {
     constructor(
         @inject('IUserRepository') private readonly userRepo: IUserRepository,
-        @inject('IProjectRepository') private readonly projectRepo: IProjectRepository
+        @inject('IProjectRepository') private readonly projectRepo: IProjectRepository,
+        @inject('IAzureBlobService') private azureService: IAzureBlobService,
+        @inject('IAuthRepository') private authRepo: IAuthRepository,
     ) {}
 
     async getUserProfileByUsername(username: string, userid?:string): Promise<{
@@ -85,16 +134,19 @@ export class UserService implements IUserService {
         followersCount: number;
         followingCount: number;
         projectsCount: number;
-        createdAt: any
+        createdAt: any;
+        authoredHackathonsCount: number;
+        participatedHackathonsCount: number;
+        subauthoredProjectsCount: number;
     }> {
         let user;
 
 
         if(!userid){
-             user = await this.userRepo.findByUsername(username);
+            user = await this.userRepo.findByUsername(username);
         }
         else{
-             user = await this.userRepo.findByUsernameAuthor(username);
+            user = await this.userRepo.findByUsernameAuthor(username);
         }
 
 
@@ -137,6 +189,145 @@ export class UserService implements IUserService {
             followingCount: publicData._count?.following ?? 0,
             projectsCount: publicData._count?.projects ?? 0,
             createdAt: publicData.createdAt,
+            authoredHackathonsCount: publicData._count?.Hackathon ?? 0,
+            participatedHackathonsCount: publicData._count?.HackathonParticipant ?? 0,
+            subauthoredProjectsCount: publicData._count?.subauthoredProjects ?? 0,
         };
+    }
+    async updateUserProfile(userId: string, data: UserUpdatePayload): Promise<User> {
+        if (data.username) {
+            const existingUser = await this.userRepo.findByUsername(data.username);
+            if (existingUser && existingUser.id !== userId) {
+                throw new ForbiddenError('Username already taken');
+            }
+        }
+
+        const updateData: Prisma.UserUpdateInput = {
+            username: data.username,
+            bio: data.bio,
+            avatarUrl: data.avatarUrl,
+        };
+
+        return this.userRepo.updateUser(userId, updateData);
+    }
+
+    async addSocialMediaLink(userId: string, link: SocialLinkPayload): Promise<SocialMedia> {
+        return this.userRepo.addSocialLink(userId, link.platform, link.url, link.handle ?? null);
+    }
+
+    async deleteSocialMediaLink(userId: string, socialMediaId: string): Promise<void> {
+        const link = await this.userRepo.getSocialLinkById(socialMediaId);
+        if (!link) {
+            throw new NotFoundError('Social link not found');
+        }
+        if (link.userId !== userId) {
+            throw new ForbiddenError('You can only delete your own social links');
+        }
+
+        await this.userRepo.removeSocialLink(socialMediaId);
+    }
+    async updateUserAvatar(
+        userId: string,
+        file: { buffer: Buffer; mimetype: string; originalname: string }
+    ): Promise<string> {
+        const fileSizeInMB = file.buffer.length / (1024 * 1024);
+
+        if (!file.mimetype.startsWith('image/')) {
+            throw new ValidationError('Unsupported file type. Only images are allowed for avatar.', 'file');
+        }
+        if (fileSizeInMB > MAX_AVATAR_SIZE_MB) {
+            throw new ValidationError(`Image file is too large. Max size is ${MAX_AVATAR_SIZE_MB}MB.`, 'file');
+        }
+
+        let processedBuffer: Buffer;
+        try {
+            processedBuffer = await sharp(file.buffer)
+                .resize(AVATAR_SIZE_PIXELS, AVATAR_SIZE_PIXELS, {
+                    fit: sharp.fit.cover,
+                    position: sharp.strategy.attention,
+                    withoutEnlargement: true
+                })
+                .jpeg({ quality: 80, progressive: true })
+                .toBuffer();
+        } catch (error:any) {
+            console.error('[AuthService] Sharp processing failed:', error);
+            throw new AppError('Failed to process avatar image.');
+        }
+
+        const filename = `avatars/${userId}-${Date.now()}.jpg`;
+        const newUrl = await this.azureService.upload(filename, processedBuffer, 'image/jpeg');
+
+        const user = await this.authRepo.getUserById(userId);
+        if (!user) throw new NotFoundError('User not found');
+
+        if (user.avatarUrl && user.avatarUrl.includes('avatars/')) {
+            try {
+                const oldFilename = user.avatarUrl.split('?')[0].split('/').pop();
+                if(oldFilename) {
+                    await this.azureService.delete(`avatars/${oldFilename}`);
+                }
+            } catch (error) {
+                console.warn(`[AuthService] Failed to delete old avatar: ${user.avatarUrl}`, error);
+            }
+        }
+
+        await this.authRepo.updateUser(userId, { avatarUrl: newUrl });
+
+        return newUrl;
+    }
+    async followUser(followerId: string, followingId: string): Promise<void> {
+        if (followerId === followingId) {
+            throw new ValidationError('Cannot follow yourself');
+        }
+
+        const followingUser = await this.authRepo.getUserById(followingId);
+        if (!followingUser) {
+            throw new NotFoundError('User to follow');
+        }
+
+        const isAlreadyFollowing = await this.userRepo.isFollowing(followerId, followingId);
+        if (isAlreadyFollowing) {
+            throw new ValidationError('You are already following this user');
+        }
+
+        await this.userRepo.createFollow(followerId, followingId);
+    }
+
+    async unfollowUser(followerId: string, followingId: string): Promise<void> {
+        if (followerId === followingId) {
+            throw new ValidationError('Cannot unfollow yourself');
+        }
+
+        const isAlreadyFollowing = await this.userRepo.isFollowing(followerId, followingId);
+        if (!isAlreadyFollowing) {
+            throw new ValidationError('You are not following this user');
+        }
+
+        await this.userRepo.deleteFollow(followerId, followingId);
+    }
+
+    async getFollowersList(userId: string): Promise<SimpleUser[]> {
+        const follows = await this.userRepo.getFollowers(userId);
+        const followsWithFollower = follows as FollowWithFollower[];
+
+        return followsWithFollower.map(f => ({
+            id: f.follower.id,
+            username: f.follower.username,
+            avatarUrl: f.follower.avatarUrl,
+        }));
+    }
+
+    async getFollowingList(userId: string): Promise<SimpleUser[]> {
+        const follows = await this.userRepo.getFollowing(userId);
+        const followsWithFollowing = follows as FollowWithFollowing[];
+
+        return followsWithFollowing.map(f => ({
+            id: f.following.id,
+            username: f.following.username,
+            avatarUrl: f.following.avatarUrl,
+        }));
+    }
+    async isUserFollowing(followerId: string, followingId: string): Promise<boolean> {
+        return this.userRepo.isFollowing(followerId, followingId);
     }
 }
