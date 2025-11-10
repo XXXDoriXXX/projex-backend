@@ -55,8 +55,11 @@ export class UserRepository implements IUserRepository {
                         followers: true,
                         following: true,
                         projects: true,
+                        Hackathon: true,
+                        HackathonParticipant: true,
+                        subauthoredProjects: true,
                     },
-                },
+                }
             },
         });
     }
@@ -88,8 +91,12 @@ export class UserRepository implements IUserRepository {
                         followers: true,
                         following: true,
                         projects: true,
+
+                        Hackathon: true,
+                        HackathonParticipant: true,
+                        subauthoredProjects: true,
                     },
-                },
+                }
             },
         });
     }

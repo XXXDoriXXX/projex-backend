@@ -4,6 +4,7 @@ import { type IUserRepository } from '../repositories/user.repository';
 import { NotFoundError } from '../errors/CustomErrors';
 import {Project, ProjectStatus, SocialMedia, Technology, User} from "@prisma/client";
 import {type IProjectRepository} from "../repositories/project.repository";
+
 export interface PublicProject {
     id: string;
     title: string;
@@ -17,6 +18,7 @@ export interface PublicProject {
     technologies?: Technology[];
     createdAt: Date;
 }
+
 export interface RawUserWithProjects extends User {
     projects: {
         id: string;
@@ -35,8 +37,12 @@ export interface RawUserWithProjects extends User {
         followers: number;
         following: number;
         projects: number;
+        Hackathon: number;
+        HackathonParticipant: number;
+        subauthoredProjects: number;
     };
 }
+
 export interface IUserProfile {
     id: string;
     username: string;
@@ -64,6 +70,9 @@ export interface IUserService {
         followingCount: number;
         projectsCount: number;
         createdAt: any
+        authoredHackathonsCount: number;
+        participatedHackathonsCount: number;
+        subauthoredProjectsCount: number;
     }>;
 }
 
@@ -85,16 +94,19 @@ export class UserService implements IUserService {
         followersCount: number;
         followingCount: number;
         projectsCount: number;
-        createdAt: any
+        createdAt: any;
+        authoredHackathonsCount: number;
+        participatedHackathonsCount: number;
+        subauthoredProjectsCount: number;
     }> {
         let user;
 
 
         if(!userid){
-             user = await this.userRepo.findByUsername(username);
+            user = await this.userRepo.findByUsername(username);
         }
         else{
-             user = await this.userRepo.findByUsernameAuthor(username);
+            user = await this.userRepo.findByUsernameAuthor(username);
         }
 
 
@@ -137,6 +149,9 @@ export class UserService implements IUserService {
             followingCount: publicData._count?.following ?? 0,
             projectsCount: publicData._count?.projects ?? 0,
             createdAt: publicData.createdAt,
+            authoredHackathonsCount: publicData._count?.Hackathon ?? 0,
+            participatedHackathonsCount: publicData._count?.HackathonParticipant ?? 0,
+            subauthoredProjectsCount: publicData._count?.subauthoredProjects ?? 0,
         };
     }
 }
