@@ -20,6 +20,9 @@ export interface IUserRepository {
     findByUsername(username: string): Promise<RawUserWithProjects | null>;
     updateUser(id: string, data: Prisma.UserUpdateInput): Promise<User>;
     findByUsernameAuthor(username: string): Promise<RawUserWithProjects | null>;
+    addSocialLink(userId: string, platform: string, url: string, handle: string | null): Promise<SocialMedia>;
+    removeSocialLink(socialMediaId: string): Promise<SocialMedia>;
+    getSocialLinkById(id: string): Promise<SocialMedia | null>;
 }
 
 @injectable()
@@ -105,6 +108,29 @@ export class UserRepository implements IUserRepository {
         return prisma.user.update({
             where: { id },
             data,
+        });
+    }
+    async addSocialLink(userId: string, platform: string, url: string, handle: string | null): Promise<SocialMedia> {
+        return prisma.socialMedia.create({
+            data: {
+                userId,
+                platform,
+                url,
+                handle,
+                verified: false,
+            },
+        });
+    }
+
+    async removeSocialLink(socialMediaId: string): Promise<SocialMedia> {
+        return prisma.socialMedia.delete({
+            where: { id: socialMediaId },
+        });
+    }
+
+    async getSocialLinkById(id: string): Promise<SocialMedia | null> {
+        return prisma.socialMedia.findUnique({
+            where: { id },
         });
     }
 }

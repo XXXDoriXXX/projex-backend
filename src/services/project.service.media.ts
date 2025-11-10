@@ -116,10 +116,8 @@ export class ProjectServiceMedia implements IProjectServiceMedia {
             throw new ValidationError('Unsupported file type', 'file');
         }
 
-        // обробка файлу в потоці
         const processedBuffer = await this.runMediaWorker(file.buffer, file.mimetype);
 
-        // аплоад в Azure
         const url = await this.azureService.upload(file.originalname, processedBuffer, file.mimetype);
 
         return this.mediaRepo.createMedia(userId, mediaType, url);
@@ -138,10 +136,8 @@ export class ProjectServiceMedia implements IProjectServiceMedia {
             throw new ValidationError('Cannot delete media that is already attached to a project', 'mediaId');
         }
 
-        // чистимо в Azure
         await this.azureService.delete(media.url);
 
-        // видаляємо з БД
         await this.mediaRepo.deleteMedia(mediaId);
     }
 }
