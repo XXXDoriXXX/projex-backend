@@ -5,7 +5,8 @@ import { Counter } from 'k6/metrics';
 const BASE_URL = 'http://localhost:3000/api/';
 const PROJECT_ID = 'cmh3596e10001c67clceobdb8';
 
-const AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWd6aWMxcngwMDAwYzYzd25nazg5YWE2IiwidXNlcm5hbWUiOiJNZW93IiwiaWF0IjoxNzYyMzQzOTg2LCJleHAiOjE3NjI0MzAzODZ9.8ha25CTaE9MST5R0s3EikGeCk6eVKzMVmNYf0MALjGc';
+declare const __ENV: Record<string, string | undefined>;
+const AUTH_TOKEN = __ENV.TEST_JWT || '';
 
 const fileUploads = new Counter('file_uploads');
 
