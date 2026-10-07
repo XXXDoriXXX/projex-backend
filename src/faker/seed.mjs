@@ -9,7 +9,10 @@ const API_BASE_URL = 'http://localhost:3000/api/hackathon'; // Вкажіть п
 const NUMBER_TO_CREATE = 100;
 
 // 🚨 ЗАМІНІТЬ ЦЕЙ ТОКЕН НА НОВИЙ!
-const AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWd6aWMxcngwMDAwYzYzd25nazg5YWE2IiwidXNlcm5hbWUiOiJNZW93IiwiaWF0IjoxNzYxNzY5MTY3LCJleHAiOjE3NjE4NTU1Njd9.SZaL75hHkKC_mFr9Jp7cX2ku5pKxow2FtLpxtim99G8';
+const AUTH_TOKEN = process.env.TEST_JWT;
+if (!AUTH_TOKEN) {
+    throw new Error('TEST_JWT environment variable is required');
+}
 
 // Налаштування екземпляра axios
 const apiClient = axios.create({

@@ -6,7 +6,7 @@ var BASE_URL = 'http://localhost:3000/api/project';
 var PROJECT_ID = 'cmh3596e10001c67clceobdb8'; // Ваш дійсний Project ID
 // Ваш тестовий токен (Bearer Token).
 // У реальному тестуванні його краще отримувати через окремий запит login.
-var AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWYxNnI4aXkwMDAwYzY0c2RxYmZtYjMwIiwidXNlcm5hbWUiOiJUZXN0IiwiaWF0IjoxNzYxMjQ5MzM0LCJleHAiOjE3NjEyNTI5MzR9.C2hf3buiO5x6oB0LVrZO0Vk9QYYi7u2sHNusNfUJZ3A';
+var AUTH_TOKEN = __ENV.TEST_JWT || '';
 // -----------------------
 // Кастомна метрика для відстеження успішних завантажень
 var fileUploads = new Counter('file_uploads');

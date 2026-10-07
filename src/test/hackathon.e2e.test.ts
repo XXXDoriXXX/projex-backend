@@ -19,17 +19,17 @@ import { prisma } from '../prisma';
 
 const AUTHOR = {
     id: 'cmgzic1rx0000c63wngk89aa6',
-    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWd6aWMxcngwMDAwYzYzd25nazg5YWE2IiwidXNlcm5hbWUiOiJNZW93IiwiaWF0IjoxNzYxNTkyNjgyLCJleHAiOjE3NjE1OTYyODJ9.QizUjoJtNAOwrLXuE9tg7_4RfW5N3sf7QI8nNWKQCms', // ОНОВЛЕНО EXP
+    token: process.env.TEST_JWT_AUTHOR as string, // ОНОВЛЕНО EXP
 };
 
 const PARTICIPANT = {
     id: 'cmf16r8iy0000c64sdqbfmb30',
-    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWYxNnI4aXkwMDAwYzY0c2RxYmZtYjMwIiwidXNlcm5hbWUiOiJUZXN0IiwiaWF0IjoxNzYxNTkyNzE4LCJleHAiOjE3NjE1OTYzMTh9.LRVbPjnJrQPQSOEI2krnFpsgAkfAuX6km4uZ4UQGdlk', // ОНОВЛЕНО EXP
+    token: process.env.TEST_JWT_PARTICIPANT as string, // ОНОВЛЕНО EXP
 };
 
 const JUDGE = {
     id: 'cmh9b3cex0000c6ocks6e5puw',
-    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWg5YjNjZXgwMDAwYzZvY2tzNmU1cHV3IiwidXNlcm5hbWUiOiJzYXNhIiwiaWF0IjoxNzYxNTkyNzQ0LCJleHAiOjE3NjE1OTYzNDR9.GXGntzRDi3x6-yvkYc2YRjZKXFlQgoxp34D4aSTgjsg', // ОНОВЛЕНО EXP
+    token: process.env.TEST_JWT_JUDGE as string, // ОНОВЛЕНО EXP
 };
 
 

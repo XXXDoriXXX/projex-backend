@@ -10,7 +10,10 @@ export const getUserById = async (id: string) => {
         select: { id: true, username: true, email: true },
     });
 };
-const JWT_SECRET = process.env.JWT_SECRET || 'MeowMeowMeow';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+}
 
 export interface AuthenticatedRequest extends Request {
     user?: {
